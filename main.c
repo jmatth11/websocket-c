@@ -11,7 +11,7 @@ static void print_buf(char *buf) {
   printf("\n");
 }
 
-const char *request = "GET /ws HTTP/1.1\r\nHost: localhost:3000\r\nAccept: */*\r\nSec-WebSocket-Extensions: permessage-deflate\r\nSec-WebSocket-Key: 7Wrl5Wp3kkEaYOVhio4o6w==\r\nConnection: keep-alive, Upgrade\r\nSec-Fetch-Dest: empty\r\nSec-Fetch-Mode: websocket\r\nSec-Fetch-Site: same-origin\r\n\r\n";
+const char *request = "GET /ws HTTP/1.1\r\nHost: localhost:3000\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: 7Wrl5Wp3kkEaYOVhio4o6w==\r\nSec-WebSocket-Version: 13\r\n\r\n";
 
 int main (int argc, char **argv) {
   struct sockaddr_in serv_addr;
