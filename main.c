@@ -11,6 +11,7 @@ static void print_buf(char *buf) {
   printf("\n");
 }
 
+// this works; time to abstract it out
 const char *request = "GET /ws HTTP/1.1\r\nHost: localhost:3000\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: 7Wrl5Wp3kkEaYOVhio4o6w==\r\nSec-WebSocket-Version: 13\r\n\r\n";
 
 int main (int argc, char **argv) {
