@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "websocket.h"
+#include "headers/websocket.h"
 
 static void print_buf(char *buf) {
   const size_t len = strlen(buf);
