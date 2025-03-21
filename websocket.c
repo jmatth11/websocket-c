@@ -150,6 +150,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   client->__internal->addr.sin_port = htons(client->port);
   if (inet_pton(AF_INET, client->host, &client->__internal->addr.sin_addr) != 1) {
     fprintf(stderr, "WebSocket Client host could not convert IP to addr.\n");
+    free(client->__internal);
     return false;
   }
   debug_client(client);
@@ -158,12 +159,15 @@ bool ws_client_connect(struct ws_client_t *client) {
   if (connect(sock, (struct sockaddr *)&client->__internal->addr,
               sizeof(client->__internal->addr)) != 0) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
+    free(client->__internal);
     return false;
   }
   client->__internal->socket = sock;
   char *req = initial_handshake(client);
   if (req == NULL) {
     fprintf(stderr, "WebSocket client failed to create handshake.\n");
+    close(client->__internal->socket);
+    free(client->__internal);
     return false;
   }
 #ifdef DEBUG
@@ -173,12 +177,16 @@ bool ws_client_connect(struct ws_client_t *client) {
   if (n == -1) {
     fprintf(stderr, "message wasn't sent\n");
     free(req);
+    close(client->__internal->socket);
+    free(client->__internal);
     return false;
   }
   free(req);
   char *response = NULL;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
+    close(client->__internal->socket);
+    free(client->__internal);
     return false;
   }
 #ifdef DEBUG
@@ -190,6 +198,8 @@ bool ws_client_connect(struct ws_client_t *client) {
   if (strcasestr(response, "Sec-Websocket-Accept: mj/2Q6QlJ3Y5pun3vzHGmTO/xgs=") == NULL) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n", response);
     free(response);
+    close(client->__internal->socket);
+    free(client->__internal);
     return false;
   }
   free(response);
@@ -239,5 +249,8 @@ void ws_client_free(struct ws_client_t *client) {
   if (client->path != NULL) {
     free(client->path);
   }
-  close(client->__internal->socket);
+  if (client->__internal != NULL) {
+    close(client->__internal->socket);
+    free(client->__internal);
+  }
 }
