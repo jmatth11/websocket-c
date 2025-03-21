@@ -1,4 +1,4 @@
 
 .PHONY: all
 all:
-	gcc main.c -o main
+	gcc -std=c11 -g -Wall main.c websocket.c -o main

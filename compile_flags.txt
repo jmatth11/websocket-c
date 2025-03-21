@@ -1,0 +1,4 @@
+-I.
+-Wall
+-std=c11
+-lm
