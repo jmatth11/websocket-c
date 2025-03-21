@@ -1,0 +1,15 @@
+name: Build-Step
+
+on: push
+
+jobs:
+  build-step:
+    name: Perform Normal Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Project
+        run: make
+
