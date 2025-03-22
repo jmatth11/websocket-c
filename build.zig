@@ -3,12 +3,12 @@ const std = @import("std");
 fn createModule(b: *std.Build, optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget) *std.Build.Module {
     const files: []const []const u8 = &.{
         "src/websocket.c",
+        "src/http.c",
     };
     const flags: []const []const u8 = &.{
         "-Wall",
         "-O2",
         "-std=c11",
-        "-lm",
     };
     const module = b.addModule("ws", .{
         .pic = true,
@@ -21,7 +21,8 @@ fn createModule(b: *std.Build, optimize: std.builtin.OptimizeMode, target: std.B
         .flags = flags,
     });
     module.addIncludePath(b.path("."));
-    module.addIncludePath(b.path("./deps/utf8-zig/headers/"));
+    module.addIncludePath(b.path("./deps/cstd/headers/"));
+    module.addIncludePath(b.path("./deps/cstd/deps/utf8-zig/headers/"));
     module.addIncludePath(.{ .cwd_relative = "/usr/include/x86_64-linux-gnu" });
     module.addIncludePath(.{ .cwd_relative = "/usr/include" });
     return module;

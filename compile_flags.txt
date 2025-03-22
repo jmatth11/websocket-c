@@ -1,4 +1,10 @@
 -I.
+-I./deps/cstd/headers
+-I./deps/cstd/deps/utf8-zig/headers/
+-L./deps/cstd/lib
+-L./deps/cstd/deps/utf8-zig/zig-out/lib/
+-lcustom_std
+-lutf8-zig
 -Wall
 -std=c11
 -lm
