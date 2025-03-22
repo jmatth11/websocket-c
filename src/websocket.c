@@ -14,7 +14,6 @@
 
 static inline void print_debug(struct ws_client_t *client);
 
-
 #ifdef DEBUG
 #define debug_client(client) print_debug(client)
 #else
