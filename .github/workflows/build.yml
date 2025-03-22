@@ -10,6 +10,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Deps
+        run: ./install_deps.sh
+
       - name: Build Project
         run: make
 
