@@ -8,6 +8,42 @@
 #include "string_ops.h"
 #include "unicode_str.h"
 
+const char *http_method_get_string(enum http_method_t method) {
+  switch (method) {
+  case HTTP_GET:
+    return HTTP_METHOD_GET;
+  case HTTP_POST:
+    return HTTP_METHOD_POST;
+  case HTTP_PUT:
+    return HTTP_METHOD_PUT;
+  case HTTP_DELETE:
+    return HTTP_METHOD_DELETE;
+  case HTTP_OPTIONS:
+    return HTTP_METHOD_OPTIONS;
+  default:
+    return "";
+  }
+}
+
+enum http_method_t http_method_get_enum(const char *method) {
+  if (strncmp(HTTP_METHOD_GET, method, strlen(HTTP_METHOD_GET)) == 0) {
+    return HTTP_GET;
+  }
+  if (strncmp(HTTP_METHOD_POST, method, strlen(HTTP_METHOD_POST)) == 0) {
+    return HTTP_POST;
+  }
+  if (strncmp(HTTP_METHOD_PUT, method, strlen(HTTP_METHOD_PUT)) == 0) {
+    return HTTP_PUT;
+  }
+  if (strncmp(HTTP_METHOD_DELETE, method, strlen(HTTP_METHOD_DELETE)) == 0) {
+    return HTTP_DELETE;
+  }
+  if (strncmp(HTTP_METHOD_OPTIONS, method, strlen(HTTP_METHOD_OPTIONS)) == 0) {
+    return HTTP_OPTIONS;
+  }
+  return HTTP_INVALID_METHOD;
+}
+
 bool http_response_init(struct http_response_t *r) {
   r->message.host = NULL;
   r->message.path = NULL;
@@ -153,7 +189,7 @@ void http_response_free(struct http_response_t *r) {
     free(r->message.path);
     r->message.protocol = NULL;
   }
-  r->message.method = NULL;
+  r->message.method = HTTP_INVALID_METHOD;
   hash_map_destroy(r->message.headers, true);
   byte_array_free(&r->message.body);
 }

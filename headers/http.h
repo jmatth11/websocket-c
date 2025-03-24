@@ -14,6 +14,7 @@
 #define HTTP_METHOD_OPTIONS "OPTIONS"
 
 enum http_method_t {
+  HTTP_INVALID_METHOD = -1,
   HTTP_GET = 0,
   HTTP_POST,
   HTTP_PUT,
@@ -21,7 +22,7 @@ enum http_method_t {
   HTTP_OPTIONS,
 };
 
-char* http_method_get_string(enum http_method_t method);
+const char* http_method_get_string(enum http_method_t method);
 enum http_method_t http_method_get_enum(const char *method);
 
 struct http_message_t {
