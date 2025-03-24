@@ -44,19 +44,41 @@ enum http_method_t http_method_get_enum(const char *method) {
   return HTTP_INVALID_METHOD;
 }
 
-bool http_response_init(struct http_response_t *r) {
-  r->message.host = NULL;
-  r->message.path = NULL;
-  r->message.method = HTTP_GET;
-  r->message.port = 80;
-  r->message.headers = hash_map_create(1000);
-  if (r->message.headers == NULL) {
+static bool http_message_init(struct http_message_t *msg) {
+  msg->host = NULL;
+  msg->path = NULL;
+  msg->method = HTTP_GET;
+  msg->port = 80;
+  msg->headers = hash_map_create(1000);
+  if (msg->headers == NULL) {
     return false;
   }
-  if (!byte_array_init(&r->message.body, 5)) {
+  if (!byte_array_init(&msg->body, 5)) {
     return false;
   }
   return true;
+}
+
+static void http_message_free(struct http_message_t *msg) {
+  if (msg->host != NULL) {
+    free(msg->host);
+    msg->host = NULL;
+  }
+  if (msg->path != NULL) {
+    free(msg->path);
+    msg->path = NULL;
+  }
+  if (msg->protocol != NULL) {
+    free(msg->path);
+    msg->protocol = NULL;
+  }
+  msg->method = HTTP_INVALID_METHOD;
+  hash_map_destroy(msg->headers, true);
+  byte_array_free(&msg->body);
+}
+
+bool http_response_init(struct http_response_t *r) {
+  return http_message_init(&r->message);
 }
 
 static size_t parse_response_start_line(struct http_response_t *r,
@@ -121,7 +143,10 @@ bool http_response_from_str(struct http_response_t *r, const char *str,
   return true;
 }
 
-char *http_response_to_str(struct http_response_t *r) { return NULL; }
+char *http_response_to_str(struct http_response_t *r) {
+  // TODO implement
+  return NULL;
+}
 
 bool http_response_set_header(struct http_response_t *r, const char *key,
                               char *value) {
@@ -177,19 +202,5 @@ bool http_response_get_header(struct http_response_t *r, const char *key,
 }
 
 void http_response_free(struct http_response_t *r) {
-  if (r->message.host != NULL) {
-    free(r->message.host);
-    r->message.host = NULL;
-  }
-  if (r->message.path != NULL) {
-    free(r->message.path);
-    r->message.path = NULL;
-  }
-  if (r->message.protocol != NULL) {
-    free(r->message.path);
-    r->message.protocol = NULL;
-  }
-  r->message.method = HTTP_INVALID_METHOD;
-  hash_map_destroy(r->message.headers, true);
-  byte_array_free(&r->message.body);
+  http_message_free(&r->message);
 }
