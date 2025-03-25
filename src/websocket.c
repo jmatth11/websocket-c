@@ -1,4 +1,5 @@
 #include "headers/websocket.h"
+#include "headers/http.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,8 @@ static inline void print_debug(struct ws_client_t *client);
   "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\n"                   \
   "Connection: Upgrade\r\nSec-WebSocket-Key: %s\r\n"                           \
   "Sec-WebSocket-Version: %d\r\n\r\n"
+
+#define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
 
 #define WS_PREFIX "ws://"
 #define PORT_SEP ':'
@@ -188,20 +191,35 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
-#ifdef DEBUG
-  printf("response: %s\n", response);
-#endif
-  // TODO maybe parse entire response for proper handling
-  // TODO support dynamic generation of Accept value
-  // TODO replace strcasestr with more portable function
-  if (strcasestr(response, "Sec-Websocket-Accept: mj/2Q6QlJ3Y5pun3vzHGmTO/xgs=") == NULL) {
-    fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n", response);
+  struct http_response_t resp;
+  if (!http_response_from_str(&resp, response, strlen(response))) {
+    fprintf(stderr, "failed to parse HTTP response message.\n");
     free(response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
   free(response);
+#ifdef DEBUG
+  printf("response: %s\n", response);
+#endif
+  // TODO support dynamic generation of Accept value
+  char *noonce = NULL;
+  if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
+    fprintf(stderr, "failed to get HTTP response header value.\n");
+    http_response_free(&resp);
+    close(client->__internal->socket);
+    free(client->__internal);
+    return false;
+  }
+  if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
+    fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n", response);
+    http_response_free(&resp);
+    close(client->__internal->socket);
+    free(client->__internal);
+    return false;
+  }
+  http_response_free(&resp);
   return true;
 }
 

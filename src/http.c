@@ -91,7 +91,8 @@ static size_t parse_response_start_line(struct http_response_t *r,
   index += word_len + 1;
   word_len = strcspn(&str[index], " ");
   char status_code[4] = {0};
-  if (strncpy(status_code, &str[index], 3) != NULL) {
+  if (strncpy(status_code, &str[index], 3) == NULL) {
+    fprintf(stderr, "failed to copy status code.\n");
     free(r->message.protocol);
     return 0;
   }

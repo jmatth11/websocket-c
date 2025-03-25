@@ -1,3 +1,5 @@
 main
 .zig-cache
 deps/
+obj
+bin
