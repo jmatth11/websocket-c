@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "base_str.h"
 #include "hash_map.h"
 #include "string_ops.h"
 #include "unicode_str.h"
@@ -145,7 +146,45 @@ bool http_response_from_str(struct http_response_t *r, const char *str,
 
 char *http_response_to_str(struct http_response_t *r) {
   // TODO implement
-  return NULL;
+  base_str result;
+  if (new_base_str(&result, 20) != C_STR_NO_ERROR) {
+    fprintf(stderr, "failed to generate response string.\n");
+    return false;
+  }
+  result.append(&result, r->message.protocol, strlen(r->message.protocol));
+  result.append(&result, " ", 1);
+  char status_code[3] = {0};
+  snprintf(status_code, 3, "%d", r->message.status_code);
+  result.append(&result, status_code, 3);
+  result.append(&result, " ", 1);
+  result.append(&result, r->message.status_text, strlen(r->message.status_text));
+  result.append(&result, "\r\n", 2);
+  struct hash_map_iterator_t *it = hash_map_iterator(r->message.headers);
+  struct hash_map_entry_t *cur_entry = hash_map_iterator_next(it);
+  while (cur_entry != NULL) {
+    result.append(&result, cur_entry->key, strlen(cur_entry->key));
+    result.append(&result, ": ", 2);
+    char *value = (char*)cur_entry->value;
+    result.append(&result, value, strlen(value));
+    result.append(&result, "\r\n", 2);
+  }
+  free(it);
+  result.append(&result, "\r\n", 2);
+  if (r->message.body.len > 0) {
+    for (size_t i = 0; i < r->message.body.len; ++i) {
+      // convert to char
+      char b = r->message.body.byte_data[i];
+      result.append(&result, &b, 1);
+    }
+  }
+  result.append(&result, "\r\n", 2);
+  char *out = NULL;
+  if (result.get_str(&result, &out) != C_STR_NO_ERROR) {
+    free_base_str(&result);
+    return NULL;
+  }
+  // we don't free the result object because we send the internal data out to the caller.
+  return out;
 }
 
 bool http_response_set_header(struct http_response_t *r, const char *key,
