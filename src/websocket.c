@@ -192,6 +192,13 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   struct http_response_t resp;
+  if (!http_response_init(&resp)) {
+    fprintf(stderr, "failed to initialize HTTP response structure.\n");
+    free(response);
+    close(client->__internal->socket);
+    free(client->__internal);
+    return false;
+  }
   if (!http_response_from_str(&resp, response, strlen(response))) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
     free(response);
