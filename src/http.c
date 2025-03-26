@@ -78,6 +78,64 @@ static void http_message_free(struct http_message_t *msg) {
   byte_array_free(&msg->body);
 }
 
+bool http_message_set_header(struct http_message_t *msg, const char *key,
+                              char *value) {
+  size_t key_len = strlen(key);
+  struct unicode_str_t *uni_key = unicode_str_create();
+  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
+    fprintf(stderr, "failed to set header during unicode conversion.\n");
+    unicode_str_destroy(uni_key);
+    return false;
+  }
+  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
+  if (new_key == NULL) {
+    fprintf(stderr, "failed to generate normalized key for header.\n");
+    return false;
+  }
+  if (!hash_map_set(msg->headers, unicode_str_to_cstr(new_key), value)) {
+    fprintf(stderr, "failed to set header.\n");
+    unicode_str_destroy(uni_key);
+    unicode_str_destroy(new_key);
+    return false;
+  }
+  unicode_str_destroy(uni_key);
+  unicode_str_destroy(new_key);
+  return true;
+}
+
+bool http_message_get_header(struct http_message_t *msg, const char *key,
+                              char **out) {
+  size_t key_len = strlen(key);
+  struct unicode_str_t *uni_key = unicode_str_create();
+  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
+    fprintf(stderr, "failed to set header during unicode conversion.\n");
+    unicode_str_destroy(uni_key);
+    return false;
+  }
+  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
+  if (new_key == NULL) {
+    fprintf(stderr, "failed to generate normalized key for header.\n");
+    return false;
+  }
+  char *normalized_key = unicode_str_to_cstr(new_key);
+#ifdef DEBUG
+  printf("normalized_key= \"%s\"\n", normalized_key);
+  fflush(stdout);
+#endif
+  if (!hash_map_get(msg->headers, normalized_key, (void **)out)) {
+    fprintf(stderr, "failed to get value from headers.\n");
+    free(normalized_key);
+    unicode_str_destroy(uni_key);
+    unicode_str_destroy(new_key);
+    return false;
+  }
+  free(normalized_key);
+  unicode_str_destroy(uni_key);
+  unicode_str_destroy(new_key);
+  return true;
+}
+
+
 bool http_response_init(struct http_response_t *r) {
   return http_message_init(&r->message);
 }
@@ -206,59 +264,12 @@ char *http_response_to_str(struct http_response_t *r) {
 
 bool http_response_set_header(struct http_response_t *r, const char *key,
                               char *value) {
-  size_t key_len = strlen(key);
-  struct unicode_str_t *uni_key = unicode_str_create();
-  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
-    fprintf(stderr, "failed to set header during unicode conversion.\n");
-    unicode_str_destroy(uni_key);
-    return false;
-  }
-  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
-  if (new_key == NULL) {
-    fprintf(stderr, "failed to generate normalized key for header.\n");
-    return false;
-  }
-  if (!hash_map_set(r->message.headers, unicode_str_to_cstr(new_key), value)) {
-    fprintf(stderr, "failed to set header.\n");
-    unicode_str_destroy(uni_key);
-    unicode_str_destroy(new_key);
-    return false;
-  }
-  unicode_str_destroy(uni_key);
-  unicode_str_destroy(new_key);
-  return true;
+  return http_message_set_header(&r->message, key, value);
 }
 
 bool http_response_get_header(struct http_response_t *r, const char *key,
                               char **out) {
-  size_t key_len = strlen(key);
-  struct unicode_str_t *uni_key = unicode_str_create();
-  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
-    fprintf(stderr, "failed to set header during unicode conversion.\n");
-    unicode_str_destroy(uni_key);
-    return false;
-  }
-  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
-  if (new_key == NULL) {
-    fprintf(stderr, "failed to generate normalized key for header.\n");
-    return false;
-  }
-  char *normalized_key = unicode_str_to_cstr(new_key);
-#ifdef DEBUG
-  printf("normalized_key= \"%s\"\n", normalized_key);
-  fflush(stdout);
-#endif
-  if (!hash_map_get(r->message.headers, normalized_key, (void **)out)) {
-    fprintf(stderr, "failed to get value from headers.\n");
-    free(normalized_key);
-    unicode_str_destroy(uni_key);
-    unicode_str_destroy(new_key);
-    return false;
-  }
-  free(normalized_key);
-  unicode_str_destroy(uni_key);
-  unicode_str_destroy(new_key);
-  return true;
+  return http_message_get_header(&r->message, key, out);
 }
 
 void http_response_free(struct http_response_t *r) {
