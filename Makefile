@@ -5,6 +5,10 @@ LIBS=-L./deps/cstd/lib -L./deps/cstd/deps/utf8-zig/zig-out/lib/ -lcustom_std -lu
 SOURCES=$(shell find . -name '*.c' -not -path './plugins/*' -not -path './deps/*' -not -path './libs/*' -not -path './tests/*')
 OBJECTS=$(addprefix $(OBJ)/,$(SOURCES:%.c=%.o))
 
+ifeq ($(DEBUG), 1)
+	CFLAGS += -DDEBUG=1 -ggdb
+endif
+
 BIN=bin
 OBJ=obj
 TARGET=main

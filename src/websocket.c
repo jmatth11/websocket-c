@@ -13,9 +13,24 @@
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // ^ quick overview of spec to implement
 
-static inline void print_debug(struct ws_client_t *client);
-
 #ifdef DEBUG
+static inline void print_debug(struct ws_client_t *client) {
+  if (client == NULL) return;
+  char *path = empty_path;
+  if (client->path != NULL) {
+    path = client->path;
+  }
+  if (client->host == NULL) {
+    fprintf(stderr, "host is null\n");
+    return;
+  }
+  int addr = 0;
+  if (client->__internal != NULL) {
+    addr = client->__internal->addr.sin_addr.s_addr;
+  }
+  printf("client->host: %s:%d%s - %d\nversion: %d\n", client->host, client->port, path, addr, client->version);
+}
+
 #define debug_client(client) print_debug(client)
 #else
 #define debug_client(client)
@@ -38,15 +53,6 @@ struct __ws_client_internal_t {
   struct sockaddr_in addr;
 };
 
-static inline void print_debug(struct ws_client_t *client) {
-  if (client == NULL) return;
-  char *path = empty_path;
-  if (client->path != NULL) {
-    path = client->path;
-  }
-  printf("client->host: %s:%d%s - %d\nversion: %d\n", client->host, client->port, path, client->__internal->addr.sin_addr.s_addr, client->version);
-}
-
 // TODO pull this out later has proper HTTP request construction
 static char *initial_handshake(struct ws_client_t *client) {
   if (client == NULL || client->host == NULL) {
@@ -57,11 +63,13 @@ static char *initial_handshake(struct ws_client_t *client) {
     path = client->path;
   }
   // use NULL destination to get formatted string length
+  // req_len for some reason doesn't include last character
+  // So we plus 2 for last character and the additional null-terminator we add.
   size_t req_len = snprintf(
       NULL, 0, WS_INIT_HANDSHAKE, path, client->host, client->port,
       "7Wrl5Wp3kkEaYOVhio4o6w==", // TODO change this to dynamic noonce
       client->version);
-  char *req = malloc((sizeof(char) * req_len) + 1);
+  char *req = malloc((sizeof(char) * req_len) + 2);
   req_len = snprintf(req, req_len + 1, WS_INIT_HANDSHAKE, path, client->host, client->port,
       "7Wrl5Wp3kkEaYOVhio4o6w==", // TODO change this to dynamic noonce
       client->version);
@@ -87,6 +95,7 @@ bool ws_client_from_str(const char *url, size_t len,
   client->path = NULL;
   client->port = 80;
   client->version = 13;
+  client->__internal = NULL;
   const size_t prefix_len = strlen(WS_PREFIX);
   if (len <= prefix_len) {
     fprintf(stderr, "URL len was the same size or shorter than the expected "
@@ -106,7 +115,7 @@ bool ws_client_from_str(const char *url, size_t len,
     fprintf(stderr, "failed to copy host from URL.\n");
     return false;
   }
-  client->host[host_len + 1] = '\0';
+  client->host[host_len] = '\0';
   if ((next_offset + prefix_len) >= len) {
     return true;
   }
@@ -130,7 +139,7 @@ bool ws_client_from_str(const char *url, size_t len,
       fprintf(stderr, "failed to copy path from URL.\n");
       return false;
     }
-    client->path[path_len + 1] = '\0';
+    client->path[path_len] = '\0';
   }
   debug_client(client);
   return true;
@@ -191,6 +200,9 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
+#ifdef DEBUG
+  printf("resp.len: %lu -- response: %s\n", strlen(response), response);
+#endif
   struct http_response_t resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
@@ -207,9 +219,6 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   free(response);
-#ifdef DEBUG
-  printf("response: %s\n", response);
-#endif
   // TODO support dynamic generation of Accept value
   char *noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
@@ -256,7 +265,7 @@ bool ws_client_recv(struct ws_client_t *client, char **out) {
     fprintf(stderr, "WebSocket client failed to copy recv buffer.\n");
     return false;
   }
-  (*out)[n + 1] = '\0';
+  (*out)[n] = '\0';
   return true;
 }
 

@@ -113,6 +113,10 @@ bool http_response_from_str(struct http_response_t *r, const char *str,
     return false;
   }
   index += line_len + 1;
+#ifdef DEBUG
+  printf("index=%zu -- len=%zu\n", index, len);
+  fflush(stdout);
+#endif
   while (index < len) {
     line_len = strcspn(&str[index], "\n");
     // if line_len is 1 it means we hit \r\n header ending
@@ -123,16 +127,26 @@ bool http_response_from_str(struct http_response_t *r, const char *str,
     }
     size_t key_len = strcspn(&str[index], ":");
     char *key = str_dup(&str[index], key_len);
+#ifdef DEBUG
+    printf("key=\"%s\"\n", key);
+    fflush(stdout);
+#endif
     // plus 2 for : and following space.
     index += key_len + 2;
     size_t value_len = strcspn(&str[index], "\r");
     char *value = str_dup(&str[index], value_len);
+#ifdef DEBUG
+    printf("value=\"%s\"\n", value);
+    fflush(stdout);
+#endif
     if (!http_response_set_header(r, key, value)) {
       free(key);
       free(value);
       fprintf(stderr, "failed to set header.\n");
       return false;
     }
+    // plus 2 for \r\n at the end of the value.
+    index += value_len + 2;
     free(key);
   }
   // if we haven't hit the end of string the rest is the body
@@ -158,14 +172,15 @@ char *http_response_to_str(struct http_response_t *r) {
   snprintf(status_code, 3, "%d", r->message.status_code);
   result.append(&result, status_code, 3);
   result.append(&result, " ", 1);
-  result.append(&result, r->message.status_text, strlen(r->message.status_text));
+  result.append(&result, r->message.status_text,
+                strlen(r->message.status_text));
   result.append(&result, "\r\n", 2);
   struct hash_map_iterator_t *it = hash_map_iterator(r->message.headers);
   struct hash_map_entry_t *cur_entry = hash_map_iterator_next(it);
   while (cur_entry != NULL) {
     result.append(&result, cur_entry->key, strlen(cur_entry->key));
     result.append(&result, ": ", 2);
-    char *value = (char*)cur_entry->value;
+    char *value = (char *)cur_entry->value;
     result.append(&result, value, strlen(value));
     result.append(&result, "\r\n", 2);
   }
@@ -184,7 +199,8 @@ char *http_response_to_str(struct http_response_t *r) {
     free_base_str(&result);
     return NULL;
   }
-  // we don't free the result object because we send the internal data out to the caller.
+  // we don't free the result object because we send the internal data out to
+  // the caller.
   return out;
 }
 
@@ -228,6 +244,10 @@ bool http_response_get_header(struct http_response_t *r, const char *key,
     return false;
   }
   char *normalized_key = unicode_str_to_cstr(new_key);
+#ifdef DEBUG
+  printf("normalized_key= \"%s\"\n", normalized_key);
+  fflush(stdout);
+#endif
   if (!hash_map_get(r->message.headers, normalized_key, (void **)out)) {
     fprintf(stderr, "failed to get value from headers.\n");
     free(normalized_key);

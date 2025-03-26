@@ -13,7 +13,7 @@ static void print_buf(char *buf) {
   printf("\n");
 }
 
-#define LISTENER_URL "ws://127.0.0.1:3000/ws"
+#define LISTENER_URL "ws://127.0.0.1:4000/ws"
 
 int main(int argc, char **argv) {
   struct ws_client_t client;
