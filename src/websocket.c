@@ -36,11 +36,7 @@ static inline void print_debug(struct ws_client_t *client) {
 #define debug_client(client)
 #endif
 
-#define WS_INIT_HANDSHAKE                                                      \
-  "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\n"                   \
-  "Connection: Upgrade\r\nSec-WebSocket-Key: %s\r\n"                           \
-  "Sec-WebSocket-Version: %d\r\n\r\n"
-
+#define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
 #define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
 
 #define WS_PREFIX "ws://"
@@ -62,23 +58,64 @@ static char *initial_handshake(struct ws_client_t *client) {
   if (client->path != NULL) {
     path = client->path;
   }
-  // use NULL destination to get formatted string length
-  // req_len for some reason doesn't include last character
-  // So we plus 2 for last character and the additional null-terminator we add.
-  size_t req_len = snprintf(
-      NULL, 0, WS_INIT_HANDSHAKE, path, client->host, client->port,
-      "7Wrl5Wp3kkEaYOVhio4o6w==", // TODO change this to dynamic noonce
-      client->version);
-  char *req = malloc((sizeof(char) * req_len) + 2);
-  req_len = snprintf(req, req_len + 1, WS_INIT_HANDSHAKE, path, client->host, client->port,
-      "7Wrl5Wp3kkEaYOVhio4o6w==", // TODO change this to dynamic noonce
-      client->version);
-  if (req_len == 0) {
-    free(req);
+  struct http_request_t req;
+  if (!http_request_init(&req)) {
+    fprintf(stderr, "failed to initialize HTTP request structure.\n");
     return NULL;
   }
-  req[req_len + 1] = '\0';
-  return req;
+  req.message.path = path;
+  req.message.host = client->host;
+  req.message.port = client->port;
+  if (!http_request_set_header(&req, "Upgrade", "websocket")){
+    fprintf(stderr, "failed to set request header.\n");
+    req.message.path = NULL;
+    req.message.host = NULL;
+    http_request_free(&req);
+    return NULL;
+  }
+  if (!http_request_set_header(&req, "Connection", "Upgrade")){
+    fprintf(stderr, "failed to set request header.\n");
+    req.message.path = NULL;
+    req.message.host = NULL;
+    http_request_free(&req);
+    return NULL;
+  }
+  if (!http_request_set_header(&req, "sec-websocket-accept", REQUEST_NOONCE)){
+    fprintf(stderr, "failed to set request header.\n");
+    req.message.path = NULL;
+    req.message.host = NULL;
+    http_request_free(&req);
+    return NULL;
+  }
+  // use NULL destination to get formatted string length
+  // returns inclusive length of string, we need to add 1 for malloc's exclusive length
+  size_t version_len = snprintf(NULL, 0, "%d", client->version) + 1;
+  // add extra 1 for null-terminator
+  char *version = malloc((sizeof(char)*version_len) + 1);
+  version_len = snprintf(version, version_len, "%d", client->version);
+  version[version_len] = '\0';
+  if (version_len == 0) {
+    fprintf(stderr, "failed to convert version to string.\n");
+    free(version);
+    req.message.path = NULL;
+    req.message.host = NULL;
+    http_request_free(&req);
+    return NULL;
+  }
+  if (!http_request_set_header(&req, "Sec-WebSocket-Version", version)){
+    fprintf(stderr, "failed to set request header.\n");
+    free(version);
+    req.message.path = NULL;
+    req.message.host = NULL;
+    http_request_free(&req);
+    return NULL;
+  }
+  free(version);
+  char *result = http_request_to_str(&req);
+  req.message.path = NULL;
+  req.message.host = NULL;
+  http_request_free(&req);
+  return result;
 }
 
 /**

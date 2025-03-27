@@ -79,7 +79,7 @@ static void http_message_free(struct http_message_t *msg) {
 }
 
 bool http_message_set_header(struct http_message_t *msg, const char *key,
-                              char *value) {
+                             char *value) {
   size_t key_len = strlen(key);
   struct unicode_str_t *uni_key = unicode_str_create();
   if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
@@ -92,7 +92,15 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
     fprintf(stderr, "failed to generate normalized key for header.\n");
     return false;
   }
-  if (!hash_map_set(msg->headers, unicode_str_to_cstr(new_key), value)) {
+  // free previous value.
+  char *out = NULL;
+  http_message_get_header(msg, key, &out);
+  if (out != NULL) {
+    free(out);
+  }
+  // set new value, we copy the value to have ownership
+  if (!hash_map_set(msg->headers, unicode_str_to_cstr(new_key),
+                    str_dup(value, strlen(value)))) {
     fprintf(stderr, "failed to set header.\n");
     unicode_str_destroy(uni_key);
     unicode_str_destroy(new_key);
@@ -104,7 +112,7 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
 }
 
 bool http_message_get_header(struct http_message_t *msg, const char *key,
-                              char **out) {
+                             char **out) {
   size_t key_len = strlen(key);
   struct unicode_str_t *uni_key = unicode_str_create();
   if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
@@ -138,7 +146,8 @@ bool http_message_get_header(struct http_message_t *msg, const char *key,
 /**
  * Function to parse the generic portion of the http message structure.
  */
-bool http_message_from_str(struct http_message_t *msg, const char *str, size_t len, size_t offset) {
+bool http_message_from_str(struct http_message_t *msg, const char *str,
+                           size_t len, size_t offset) {
   size_t index = offset;
   while (index < len) {
     size_t line_len = strcspn(&str[index], "\n");
@@ -298,7 +307,7 @@ void http_response_free(struct http_response_t *r) {
 /// HTTP Request functions
 
 static size_t parse_request_start_line(struct http_request_t *r,
-                                        const char *str, size_t len) {
+                                       const char *str, size_t len) {
   size_t index = 0;
   size_t word_len = strcspn(str, " ");
   char *method = str_dup(str, word_len);
@@ -347,11 +356,23 @@ char *http_request_to_str(struct http_request_t *r) {
   result.append(&result, " ", 1);
   result.append(&result, r->message.path, strlen(r->message.path));
   result.append(&result, " ", 1);
-  result.append(&result, r->message.protocol,
-                strlen(r->message.protocol));
+  result.append(&result, r->message.protocol, strlen(r->message.protocol));
   result.append(&result, "\r\n", 2);
+
+  size_t host_len = snprintf(NULL, 0, "%s:%d", r->message.host, r->message.port) + 1;
+  char *host = malloc((sizeof(char)*host_len) + 1);
+  host_len = snprintf(host, host_len, "%s:%d", r->message.host, r->message.port);
+  host[host_len] = '\0';
+  if (!http_request_set_header(r, "Host", host)) {
+    fprintf(stderr, "failed to set host header in request.\n");
+    free(host);
+    free_base_str(&result);
+  }
+  free(host);
+
   if (!http_message_to_str(&r->message, &result)) {
     fprintf(stderr, "failed to write out http message structure.\n");
+    free_base_str(&result);
     return NULL;
   }
   char *out = NULL;
@@ -396,8 +417,6 @@ bool http_request_write(struct http_request_t *r, const uint8_t *buf,
   return true;
 }
 
-
 void http_request_free(struct http_request_t *r) {
   http_message_free(&r->message);
 }
-
