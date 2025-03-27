@@ -13,6 +13,20 @@
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // ^ quick overview of spec to implement
 
+#define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
+#define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
+
+#define WS_PREFIX "ws://"
+#define PORT_SEP ':'
+#define PATH_SEP '/'
+#define PROTOCOL "HTTP/1.1"
+static char *empty_path = "/";
+
+struct __ws_client_internal_t {
+  int socket;
+  struct sockaddr_in addr;
+};
+
 #ifdef DEBUG
 static inline void print_debug(struct ws_client_t *client) {
   if (client == NULL) return;
@@ -36,19 +50,6 @@ static inline void print_debug(struct ws_client_t *client) {
 #define debug_client(client)
 #endif
 
-#define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
-#define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
-
-#define WS_PREFIX "ws://"
-#define PORT_SEP ':'
-#define PATH_SEP '/'
-static char *empty_path = "/";
-
-struct __ws_client_internal_t {
-  int socket;
-  struct sockaddr_in addr;
-};
-
 static bool set_handshake_headers(struct http_request_t *req, struct ws_client_t *client) {
   if (!http_request_set_header(req, "Upgrade", "websocket")){
     fprintf(stderr, "failed to set request header.\n");
@@ -58,7 +59,7 @@ static bool set_handshake_headers(struct http_request_t *req, struct ws_client_t
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
-  if (!http_request_set_header(req, "sec-websocket-accept", REQUEST_NOONCE)){
+  if (!http_request_set_header(req, "sec-websocket-key", REQUEST_NOONCE)){
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
@@ -97,16 +98,19 @@ static char *initial_handshake(struct ws_client_t *client) {
     return NULL;
   }
   req.message.path = path;
+  req.message.protocol = PROTOCOL;
   req.message.host = client->host;
   req.message.port = client->port;
   if (!set_handshake_headers(&req, client)) {
     fprintf(stderr, "failed to set WebSocket handshake headers.\n");
+    req.message.protocol = NULL;
     req.message.path = NULL;
     req.message.host = NULL;
     http_request_free(&req);
     return NULL;
   }
   char *result = http_request_to_str(&req);
+  req.message.protocol = NULL;
   req.message.path = NULL;
   req.message.host = NULL;
   http_request_free(&req);

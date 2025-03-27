@@ -128,7 +128,6 @@ bool http_message_get_header(struct http_message_t *msg, const char *key,
   fflush(stdout);
 #endif
   if (!hash_map_get(msg->headers, normalized_key, (void **)out)) {
-    fprintf(stderr, "failed to get value from headers.\n");
     free(normalized_key);
     return false;
   }
@@ -197,6 +196,7 @@ bool http_message_to_str(struct http_message_t *msg, base_str *result) {
     char *value = (char *)cur_entry->value;
     result->append(result, value, strlen(value));
     result->append(result, "\r\n", 2);
+    cur_entry = hash_map_iterator_next(it);
   }
   free(it);
   // empty line
@@ -208,8 +208,8 @@ bool http_message_to_str(struct http_message_t *msg, base_str *result) {
       char b = msg->body.byte_data[i];
       result->append(result, &b, 1);
     }
+    result->append(result, "\r\n", 2);
   }
-  result->append(result, "\r\n", 2);
   return true;
 }
 
@@ -340,6 +340,10 @@ bool http_request_from_str(struct http_request_t *r, const char *str,
 }
 
 char *http_request_to_str(struct http_request_t *r) {
+  if (r->message.method == HTTP_INVALID_METHOD || r->message.path == NULL || r->message.protocol == NULL || r->message.host == NULL) {
+    fprintf(stderr, "missing required properties.\n");
+    return NULL;
+  }
   base_str result;
   if (new_base_str(&result, 20) != C_STR_NO_ERROR) {
     fprintf(stderr, "failed to generate response string.\n");

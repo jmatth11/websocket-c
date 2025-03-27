@@ -13,7 +13,7 @@ static void print_buf(char *buf) {
   printf("\n");
 }
 
-#define LISTENER_URL "ws://127.0.0.1:4000/ws"
+#define LISTENER_URL "ws://127.0.0.1:3000/ws"
 
 int main(int argc, char **argv) {
   struct ws_client_t client;
@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   while (1) {
+    printf("waiting for messages...\n");
     char *response = NULL;
     if (!ws_client_recv(&client, &response)) {
       fprintf(stderr, "client failed to recv.\n");
