@@ -45,6 +45,26 @@ enum http_method_t http_method_get_enum(const char *method) {
   return HTTP_INVALID_METHOD;
 }
 
+static char * normalized_cstr(const char *str, size_t len) {
+  size_t str_len = strlen(str);
+  struct unicode_str_t *uni_str = unicode_str_create();
+  if (unicode_str_set_char(uni_str, str, str_len) < str_len) {
+    fprintf(stderr, "failed to set header during unicode conversion.\n");
+    unicode_str_destroy(uni_str);
+    return false;
+  }
+  struct unicode_str_t *new_str = unicode_str_to_lower(uni_str);
+  if (new_str == NULL) {
+    fprintf(stderr, "failed to generate normalized str for header.\n");
+    unicode_str_destroy(uni_str);
+    return false;
+  }
+  char *normalized_str = unicode_str_to_cstr(new_str);
+  unicode_str_destroy(uni_str);
+  unicode_str_destroy(new_str);
+  return normalized_str;
+}
+
 static bool http_message_init(struct http_message_t *msg) {
   msg->host = NULL;
   msg->path = NULL;
@@ -81,17 +101,7 @@ static void http_message_free(struct http_message_t *msg) {
 bool http_message_set_header(struct http_message_t *msg, const char *key,
                              char *value) {
   size_t key_len = strlen(key);
-  struct unicode_str_t *uni_key = unicode_str_create();
-  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
-    fprintf(stderr, "failed to set header during unicode conversion.\n");
-    unicode_str_destroy(uni_key);
-    return false;
-  }
-  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
-  if (new_key == NULL) {
-    fprintf(stderr, "failed to generate normalized key for header.\n");
-    return false;
-  }
+  char *normalized_key = normalized_cstr(key, key_len);
   // free previous value.
   char *out = NULL;
   http_message_get_header(msg, key, &out);
@@ -99,33 +109,19 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
     free(out);
   }
   // set new value, we copy the value to have ownership
-  if (!hash_map_set(msg->headers, unicode_str_to_cstr(new_key),
+  if (!hash_map_set(msg->headers, normalized_key,
                     str_dup(value, strlen(value)))) {
     fprintf(stderr, "failed to set header.\n");
-    unicode_str_destroy(uni_key);
-    unicode_str_destroy(new_key);
+    free(normalized_key);
     return false;
   }
-  unicode_str_destroy(uni_key);
-  unicode_str_destroy(new_key);
   return true;
 }
 
 bool http_message_get_header(struct http_message_t *msg, const char *key,
                              char **out) {
   size_t key_len = strlen(key);
-  struct unicode_str_t *uni_key = unicode_str_create();
-  if (unicode_str_set_char(uni_key, key, key_len) < key_len) {
-    fprintf(stderr, "failed to set header during unicode conversion.\n");
-    unicode_str_destroy(uni_key);
-    return false;
-  }
-  struct unicode_str_t *new_key = unicode_str_to_lower(uni_key);
-  if (new_key == NULL) {
-    fprintf(stderr, "failed to generate normalized key for header.\n");
-    return false;
-  }
-  char *normalized_key = unicode_str_to_cstr(new_key);
+  char *normalized_key = normalized_cstr(key, key_len);
 #ifdef DEBUG
   printf("normalized_key= \"%s\"\n", normalized_key);
   fflush(stdout);
@@ -133,13 +129,9 @@ bool http_message_get_header(struct http_message_t *msg, const char *key,
   if (!hash_map_get(msg->headers, normalized_key, (void **)out)) {
     fprintf(stderr, "failed to get value from headers.\n");
     free(normalized_key);
-    unicode_str_destroy(uni_key);
-    unicode_str_destroy(new_key);
     return false;
   }
   free(normalized_key);
-  unicode_str_destroy(uni_key);
-  unicode_str_destroy(new_key);
   return true;
 }
 
@@ -177,9 +169,10 @@ bool http_message_from_str(struct http_message_t *msg, const char *str,
       fprintf(stderr, "failed to set header.\n");
       return false;
     }
+    free(key);
+    free(value);
     // plus 2 for \r\n at the end of the value.
     index += value_len + 2;
-    free(key);
   }
   // if we haven't hit the end of string the rest is the body
   for (; index < len; ++index) {
@@ -410,7 +403,7 @@ bool http_request_write(struct http_request_t *r, const uint8_t *buf,
                         size_t len) {
   for (size_t i = 0; i < len; ++i) {
     if (!byte_array_insert(&r->message.body, buf[i])) {
-      fprintf(stderr, "failed writing c string to request body.\n");
+      fprintf(stderr, "failed writing string to request body.\n");
       return false;
     }
   }
