@@ -182,4 +182,86 @@ bool http_response_get_header(struct http_response_t *r, const char *key,
 void http_response_free(struct http_response_t *r) __nonnull((1));
 
 /// HTTP Request functions.
+
+/**
+ * Initialize internals of HTTP request.
+ *
+ * @param[in] r The HTTP request structure.
+ * @return True on success, False otherwise.
+ */
+bool http_request_init(struct http_request_t *r) __nonnull((1));
+
+/**
+ * Populate HTTP request with given request string.
+ *
+ * @param[in] r The HTTP request structure.
+ * @param[in] str The request string.
+ * @param[in] len The length of the request string.
+ * @return True on success, False otherwise.
+ */
+bool http_request_from_str(struct http_request_t *r, const char *str,
+                           size_t len) __nonnull((1, 2));
+
+/**
+ * Get the HTTP request string from the given HTTP request structure.
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param[in] r The HTTP request structure.
+ * @return The HTTP request string, NULL if failure.
+ */
+char *http_request_to_str(struct http_request_t *r) __nonnull((1));
+
+/**
+ * Set Header in the HTTP request structure.
+ *
+ * @param[in] r The HTTP request structure.
+ * @param[in] key The Header key, expects a null-terminated string.
+ * @param[in] value The Header value, expects a null-terminated string.
+ * @return True on success, False otherwise.
+ */
+bool http_request_set_header(struct http_request_t *r, const char *key,
+                             char *value) __nonnull((1, 2, 3));
+
+/**
+ * Get Header from the HTTP request structure.
+ *
+ * @param[in] r The HTTP request structure.
+ * @param[in] key The Header key, expects a null-terminated string.
+ * @param[out] out The Header value to populate.
+ * @return True on success, False otherwise.
+ */
+bool http_request_get_header(struct http_request_t *r, const char *key,
+                             char **out) __nonnull((1, 2));
+
+/**
+ * Write C string to request body.
+ * This operation copies the given bytes.
+ *
+ * @param[in] r The HTTP request structure.
+ * @param[in] str The C string to write.
+ * @param[in] len The length of the C string.
+ * @return True on success, False otherwise.
+ */
+bool http_request_write_cstr(struct http_request_t *r, const char *str,
+                             size_t len) __nonnull((1, 2));
+
+/**
+ * Write buffer to request body.
+ * This operation copies the given bytes.
+ *
+ * @param[in] r The HTTP request structure.
+ * @param[in] buf The buffer to write.
+ * @param[in] len The length of the C string.
+ * @return True on success, False otherwise.
+ */
+bool http_request_write(struct http_request_t *r, const uint8_t *buf,
+                        size_t len) __nonnull((1, 2));
+
+/**
+ * Free the internals of the given HTTP request structure.
+ *
+ * @param[in] r The HTTP request structure.
+ */
+void http_request_free(struct http_request_t *r) __nonnull((1));
+
 #endif
