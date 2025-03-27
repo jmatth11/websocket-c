@@ -115,6 +115,7 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
     free(normalized_key);
     return false;
   }
+  free(normalized_key);
   return true;
 }
 
