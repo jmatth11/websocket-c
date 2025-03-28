@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "unicode_str.h"
+
 struct __ws_client_internal_t;
 struct ws_client_t {
   struct __ws_client_internal_t *__internal;
@@ -24,6 +26,12 @@ struct ws_client_t {
    * Default is 13.
    */
   unsigned short version;
+};
+
+struct ws_message_t {
+  // TODO replace with proper protocol type
+  int type;
+  byte_array body;
 };
 
 /**
