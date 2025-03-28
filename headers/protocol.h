@@ -8,7 +8,14 @@
 #include "unicode_str.h"
 #include "defs.h"
 
-#define FIRST_BIT(x) ((x) & (1<<7))
+enum ws_frame_error_t {
+  WS_FRAME_SUCCESS = 0,
+  WS_FRAME_INVALID,
+  WS_FRAME_ERROR_LEN,
+  WS_FRAME_ERROR_RSV_SET,
+  WS_FRAME_ERROR_OPCODE,
+
+};
 
 enum ws_opcode_t {
   /**
@@ -53,7 +60,7 @@ enum ws_opcode_t {
   OPCODE_C_RES5 = 0xF,
 };
 
-struct __attribute__((packed)) ws_frame_t  {
+struct ws_frame_t {
   /**
    * Final frame flag.
    */
@@ -61,10 +68,13 @@ struct __attribute__((packed)) ws_frame_t  {
   /**
    * Reserved bits, must be zero unless an extension is negotiated.
    * If a nonzero value is received with no extensions the endpoint MUST fail.
+   *
+   * rsv1 is for compression.
+   * rsv2 and rsv3 currently should never be set.
    */
-  uint8_t res1 : 1;
-  uint8_t res2 : 1;
-  uint8_t res3 : 1;
+  uint8_t rsv1 : 1;
+  uint8_t rsv2 : 1;
+  uint8_t rsv3 : 1;
   /**
    * Opcode for frame.
    * Unknown opcodes cause WebSocket failure.
@@ -86,7 +96,7 @@ struct __attribute__((packed)) ws_frame_t  {
   /**
    * Masking key used with payload, if mask flag was set.
    */
-  uint32_t masking_key;
+  uint8_t masking_key[4];
   /**
    * The frame payload.
    */
@@ -109,7 +119,7 @@ bool ws_frame_init(struct ws_frame_t *frame) __nonnull((1));
  * @param[in] len The buffered data length.
  * @return True on success, False otherwise.
  */
-bool ws_frame_read(struct ws_frame_t *frame, uint8_t *buf, size_t len) __nonnull((1, 2));
+enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf, size_t len) __nonnull((1, 2));
 
 /**
  * Free internals of WebSocket Frame structure.
