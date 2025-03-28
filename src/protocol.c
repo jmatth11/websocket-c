@@ -8,11 +8,12 @@
 
 bool ws_frame_init(struct ws_frame_t *frame) {
   memset(frame, 0, sizeof(struct ws_frame_t));
-  return byte_array_init(&frame->payload, 125);
+  return true;
 }
 
 static enum ws_frame_error_t ws_frame_extended_len(struct ws_frame_t *frame,
-                                                   uint8_t *buf, size_t len, size_t *offset) {
+                                                   uint8_t *buf, size_t len,
+                                                   size_t *offset) {
   uint8_t extend_len = 0;
   switch (frame->payload_len) {
   case 126:
@@ -45,8 +46,36 @@ static enum ws_frame_error_t ws_frame_extended_len(struct ws_frame_t *frame,
   return WS_FRAME_SUCCESS;
 }
 
-static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame, uint8_t *buf, size_t len, size_t *offset) {
-  if (frame->mask) {
+static enum ws_frame_error_t
+ws_frame_write_len(struct ws_frame_t *frame, byte_array *out, size_t *offset) {
+  size_t idx = *offset;
+  switch (frame->info.flags.payload_len) {
+  case 126: {
+    out->byte_data[idx] = (frame->payload.len >> 8) & 0xFF;
+    out->byte_data[idx + 1] = (frame->payload.len) & 0xFF;
+    *offset = idx + 2;
+    break;
+  }
+  case 127: {
+    out->byte_data[idx] = (frame->payload.len >> 56) & 0xFF;
+    out->byte_data[idx + 1] = (frame->payload.len >> 48) & 0xFF;
+    out->byte_data[idx + 2] = (frame->payload.len >> 40) & 0xFF;
+    out->byte_data[idx + 3] = (frame->payload.len >> 32) & 0xFF;
+    out->byte_data[idx + 4] = (frame->payload.len >> 24) & 0xFF;
+    out->byte_data[idx + 5] = (frame->payload.len >> 16) & 0xFF;
+    out->byte_data[idx + 6] = (frame->payload.len >> 8) & 0xFF;
+    out->byte_data[idx + 7] = (frame->payload.len) & 0xFF;
+    *offset = idx + 8;
+    break;
+  }
+  }
+  return WS_FRAME_SUCCESS;
+}
+
+static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
+                                                   uint8_t *buf, size_t len,
+                                                   size_t *offset) {
+  if (!frame->info.flags.mask) {
     size_t idx = *offset;
     if (len < (idx + 4)) {
       return WS_FRAME_ERROR_LEN;
@@ -58,26 +87,41 @@ static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame, uin
   return WS_FRAME_SUCCESS;
 }
 
-static enum ws_frame_error_t ws_frame_extract_payload(struct ws_frame_t *frame, uint8_t *buf, size_t len, size_t *offset) {
-  if (!frame->mask) {
-    for (size_t i = *offset; i < len; ++i) {
-      if (!byte_array_insert(&frame->payload, buf[i])) {
-        return WS_FRAME_INVALID;
-      }
+/**
+ * Handle transferring payload from src to dest and apply a masking key if supplied one.
+ */
+static enum ws_frame_error_t ws_frame_handle_payload(bool mask,
+                                                     uint8_t masking_key[4],
+                                                     uint8_t *restrict dest,
+                                                     uint8_t *restrict src,
+                                                     size_t len) {
+  if (!mask) {
+    for (size_t i = 0; i < len; ++i) {
+      dest[i] = src[i];
     }
   } else {
     // this is a simple iteration with the mask
     // investigate simd instructions
-    for (size_t i = *offset, mask_idx = 0; i < len; ++i, ++mask_idx) {
+    for (size_t i = 0; i < len; ++i) {
       // xor byte with mask. iterate through key as we count through the bytes.
-      uint8_t val = buf[i] ^ frame->masking_key[mask_idx & 3];
-      if (!byte_array_insert(&frame->payload, val)) {
-        return WS_FRAME_INVALID;
-      }
+      dest[i] = src[i] ^ masking_key[i & 3];
     }
   }
-  *offset = len;
   return WS_FRAME_SUCCESS;
+}
+
+size_t ws_frame_output_size(struct ws_frame_t *frame) {
+  // 2 comes from the first two bytes
+  size_t out_len = 2 + frame->payload.len;
+  if (frame->info.flags.mask) {
+    out_len += 4;
+  }
+  if (frame->payload.len <= 125) {
+    return out_len;
+  } else if (frame->payload.len <= 65536) {
+    return out_len + 2;
+  }
+  return out_len + 8;
 }
 
 enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
@@ -86,15 +130,9 @@ enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
     return WS_FRAME_ERROR_LEN;
   }
   size_t offset = 2;
-  uint8_t byte1 = buf[0];
-  uint8_t byte2 = buf[1];
-  frame->fin = byte1 & _BV(7);
-  frame->rsv1 = byte1 & _BV(6);
-  frame->rsv2 = byte1 & _BV(5);
-  frame->rsv3 = byte1 & _BV(4);
-  frame->opcode = byte1 & 0b00001111;
-  frame->mask = byte2 & _BV(7);
-  frame->payload_len = byte2 & 0b01111111;
+  frame->codes.value = buf[0];
+  frame->info.value = buf[1];
+  frame->payload_len = frame->info.flags.payload_len;
   enum ws_frame_error_t err = ws_frame_extended_len(frame, buf, len, &offset);
   if (err != WS_FRAME_SUCCESS) {
     return err;
@@ -103,7 +141,56 @@ enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
   if (err != WS_FRAME_SUCCESS) {
     return err;
   }
-  return ws_frame_extract_payload(frame, buf, len, &offset);
+  if (len < (offset + frame->payload_len)) {
+    return WS_FRAME_ERROR_LEN;
+  }
+  if (!byte_array_init(&frame->payload, frame->payload_len)) {
+    return WS_FRAME_MALLOC_ERROR;
+  }
+  frame->payload.len = frame->payload_len;
+  return ws_frame_handle_payload(frame->info.flags.mask, frame->masking_key,
+                                 frame->payload.byte_data, &buf[offset],
+                                 frame->payload_len);
+}
+
+enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame,
+                                     byte_array *out) {
+  size_t out_len = ws_frame_output_size(frame);
+  if (!byte_array_init(out, out_len)) {
+    return WS_FRAME_MALLOC_ERROR;
+  }
+  out->len = out_len;
+  size_t offset = 2;
+  out->byte_data[0] = frame->codes.value;
+  if (frame->payload.len <= 125) {
+    frame->info.flags.payload_len = frame->payload.len;
+  } else if (frame->payload.len < 65536) {
+    frame->info.flags.payload_len = 126;
+  } else {
+    frame->info.flags.payload_len = 127;
+  }
+  out->byte_data[1] = frame->info.value;
+  enum ws_frame_error_t err = ws_frame_write_len(frame, out, &offset);
+  if (err != WS_FRAME_SUCCESS) {
+    byte_array_free(out);
+    return err;
+  }
+  if (frame->info.flags.mask) {
+    out->byte_data[offset] = frame->masking_key[0];
+    out->byte_data[offset + 1] = frame->masking_key[1];
+    out->byte_data[offset + 2] = frame->masking_key[2];
+    out->byte_data[offset + 3] = frame->masking_key[3];
+    offset += 4;
+  }
+  // ensure property matches actual length
+  frame->payload_len = frame->payload.len;
+  if (out->len < (offset + frame->payload_len)) {
+    byte_array_free(out);
+    return WS_FRAME_ERROR_LEN;
+  }
+  return ws_frame_handle_payload(frame->info.flags.mask, frame->masking_key,
+                                 &out->byte_data[offset],
+                                 frame->payload.byte_data, frame->payload.len);
 }
 
 void ws_frame_free(struct ws_frame_t *frame) {

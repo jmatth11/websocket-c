@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "unicode_str.h"
 #include "defs.h"
+#include "unicode_str.h"
 
 enum ws_frame_error_t {
   WS_FRAME_SUCCESS = 0,
@@ -14,7 +14,7 @@ enum ws_frame_error_t {
   WS_FRAME_ERROR_LEN,
   WS_FRAME_ERROR_RSV_SET,
   WS_FRAME_ERROR_OPCODE,
-
+  WS_FRAME_MALLOC_ERROR,
 };
 
 enum ws_opcode_t {
@@ -62,29 +62,55 @@ enum ws_opcode_t {
 
 struct ws_frame_t {
   /**
-   * Final frame flag.
+   * The frame specific codes.
    */
-  uint8_t fin : 1;
+  union {
+    uint8_t value;
+    struct {
+      /**
+       * Opcode for frame.
+       * Unknown opcodes cause WebSocket failure.
+       */
+      enum ws_opcode_t opcode : 4;
+      /**
+       * Reserved bits, must be zero unless an extension is negotiated.
+       * If a nonzero value is received with no extensions the endpoint MUST
+       * fail.
+       *
+       * rsv1 is for compression.
+       * rsv2 and rsv3 currently should never be set.
+       */
+      uint8_t rsv3 : 1;
+      uint8_t rsv2 : 1;
+      uint8_t rsv1 : 1;
+      /**
+       * Final frame flag.
+       */
+      uint8_t fin : 1;
+    } flags;
+  } codes;
+
   /**
-   * Reserved bits, must be zero unless an extension is negotiated.
-   * If a nonzero value is received with no extensions the endpoint MUST fail.
-   *
-   * rsv1 is for compression.
-   * rsv2 and rsv3 currently should never be set.
+   * The payload information.
    */
-  uint8_t rsv1 : 1;
-  uint8_t rsv2 : 1;
-  uint8_t rsv3 : 1;
-  /**
-   * Opcode for frame.
-   * Unknown opcodes cause WebSocket failure.
-   */
-  enum ws_opcode_t opcode : 4;
-  /**
-   * Masking key flag.
-   * All frames from client to server must have mask flag set.
-   */
-  uint8_t mask : 1;
+  union {
+    uint8_t value;
+    struct {
+      /**
+       * Payload Length.
+       * 3 scenarios.
+       * - 0-125 (length is as is)
+       * - 126 (length is 16 bits)
+       * - 127 (length is 64 bits)
+       */
+      uint8_t payload_len : 7;
+      /**
+       * Masking key flag.
+       * All frames from client to server must have mask flag set.
+       */
+      uint8_t mask : 1;
+    } flags;
+  } info;
   /**
    * Payload Length.
    * 3 scenarios.
@@ -112,6 +138,14 @@ struct ws_frame_t {
 bool ws_frame_init(struct ws_frame_t *frame) __nonnull((1));
 
 /**
+ * Get the calculated output buffer size of the frame.
+ *
+ * @param[in] frame The WebSocket frame.
+ * @return The output buffer size.
+ */
+size_t ws_frame_output_size(struct ws_frame_t *frame) __nonnull((1));
+
+/**
  * Read WebSocket frame.
  *
  * @param[in] frame The WebSocket frame structure.
@@ -119,7 +153,18 @@ bool ws_frame_init(struct ws_frame_t *frame) __nonnull((1));
  * @param[in] len The buffered data length.
  * @return True on success, False otherwise.
  */
-enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf, size_t len) __nonnull((1, 2));
+enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
+                                    size_t len) __nonnull((1, 2));
+
+/**
+ * Write WebSocket frame.
+ *
+ * @param[in] frame The WebSocket frame structure.
+ * @param[out] out The byte array to populate.
+ * @return True on success, False otherwise.
+ */
+enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame, byte_array *out)
+    __nonnull((1, 2));
 
 /**
  * Free internals of WebSocket Frame structure.
