@@ -1,5 +1,6 @@
 #include "headers/websocket.h"
 #include "headers/http.h"
+#include "unicode_str.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,8 @@ struct __ws_client_internal_t {
 
 #ifdef DEBUG
 static inline void print_debug(struct ws_client_t *client) {
-  if (client == NULL) return;
+  if (client == NULL)
+    return;
   char *path = empty_path;
   if (client->path != NULL) {
     path = client->path;
@@ -42,7 +44,8 @@ static inline void print_debug(struct ws_client_t *client) {
   if (client->__internal != NULL) {
     addr = client->__internal->addr.sin_addr.s_addr;
   }
-  printf("client->host: %s:%d%s - %d\nversion: %d\n", client->host, client->port, path, addr, client->version);
+  printf("client->host: %s:%d%s - %d\nversion: %d\n", client->host,
+         client->port, path, addr, client->version);
 }
 
 #define debug_client(client) print_debug(client)
@@ -50,24 +53,26 @@ static inline void print_debug(struct ws_client_t *client) {
 #define debug_client(client)
 #endif
 
-static bool set_handshake_headers(struct http_request_t *req, struct ws_client_t *client) {
-  if (!http_request_set_header(req, "Upgrade", "websocket")){
+static bool set_handshake_headers(struct http_request_t *req,
+                                  struct ws_client_t *client) {
+  if (!http_request_set_header(req, "Upgrade", "websocket")) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
-  if (!http_request_set_header(req, "Connection", "Upgrade")){
+  if (!http_request_set_header(req, "Connection", "Upgrade")) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
-  if (!http_request_set_header(req, "sec-websocket-key", REQUEST_NOONCE)){
+  if (!http_request_set_header(req, "sec-websocket-key", REQUEST_NOONCE)) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
   // use NULL destination to get formatted string length
-  // returns inclusive length of string, we need to add 1 for malloc's exclusive length
+  // returns inclusive length of string, we need to add 1 for malloc's exclusive
+  // length
   size_t version_len = snprintf(NULL, 0, "%d", client->version) + 1;
   // add extra 1 for null-terminator
-  char *version = malloc((sizeof(char)*version_len) + 1);
+  char *version = malloc((sizeof(char) * version_len) + 1);
   version_len = snprintf(version, version_len, "%d", client->version);
   version[version_len] = '\0';
   if (version_len == 0) {
@@ -75,7 +80,7 @@ static bool set_handshake_headers(struct http_request_t *req, struct ws_client_t
     free(version);
     return false;
   }
-  if (!http_request_set_header(req, "Sec-WebSocket-Version", version)){
+  if (!http_request_set_header(req, "Sec-WebSocket-Version", version)) {
     fprintf(stderr, "failed to set request header.\n");
     free(version);
     return false;
@@ -195,7 +200,8 @@ bool ws_client_connect(struct ws_client_t *client) {
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
   client->__internal->addr.sin_family = AF_INET;
   client->__internal->addr.sin_port = htons(client->port);
-  if (inet_pton(AF_INET, client->host, &client->__internal->addr.sin_addr) != 1) {
+  if (inet_pton(AF_INET, client->host, &client->__internal->addr.sin_addr) !=
+      1) {
     fprintf(stderr, "WebSocket Client host could not convert IP to addr.\n");
     free(client->__internal);
     return false;
@@ -229,9 +235,10 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   free(req);
-  char *response = NULL;
+  byte_array response;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
+    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
@@ -242,19 +249,24 @@ bool ws_client_connect(struct ws_client_t *client) {
   struct http_response_t resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
-    free(response);
+    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  if (!http_response_from_str(&resp, response, strlen(response))) {
+  char *resp_cstr = malloc((sizeof(char) * response.len) + 1);
+  memcpy(resp_cstr, response.byte_data, response.len);
+  resp_cstr[response.len] = '\0';
+  if (!http_response_from_str(&resp, resp_cstr, response.len)) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
-    free(response);
+    free(resp_cstr);
+    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  free(response);
+  free(resp_cstr);
+  byte_array_free(&response);
   // TODO support dynamic generation of Accept value
   char *noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
@@ -265,7 +277,8 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
-    fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n", response);
+    fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
+            resp.message.status_text);
     http_response_free(&resp);
     close(client->__internal->socket);
     free(client->__internal);
@@ -283,26 +296,19 @@ bool ws_client_connect(struct ws_client_t *client) {
  * @param[out] out The recieved data.
  * @return True if successful, False otherwise.
  */
-bool ws_client_recv(struct ws_client_t *client, char **out) {
-  char buffer[BUFSIZ] = {0};
+bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
+  uint8_t buffer[BUFSIZ] = {0};
   const ssize_t n = recv(client->__internal->socket, buffer, BUFSIZ, 0);
   if (n == -1) {
     fprintf(stderr, "WebSocket client recieve failure.\n");
     return false;
   }
-  *out = malloc((sizeof(char)*n)+1);
-  if (*out == NULL) {
-    fprintf(stderr, "WebSocket client failed to malloc response.\n");
+  if (!byte_array_init(out, n)) {
+    fprintf(stderr, "WebSocket failed to initialize received bytes.\n");
     return false;
   }
-  if (strncpy(*out, buffer, n) == NULL) {
-    free(*out);
-    *out = NULL;
-    fprintf(stderr, "WebSocket client failed to copy recv buffer.\n");
-    return false;
-  }
-  (*out)[n] = '\0';
-  return true;
+  out->len = n;
+  return memcpy(out->byte_data, buffer, n) != NULL;
 }
 
 /**
@@ -311,7 +317,8 @@ bool ws_client_recv(struct ws_client_t *client, char **out) {
  * @param client The WebSocket Client.
  */
 void ws_client_free(struct ws_client_t *client) {
-  if (client == NULL) return;
+  if (client == NULL)
+    return;
   if (client->host != NULL) {
     free(client->host);
   }

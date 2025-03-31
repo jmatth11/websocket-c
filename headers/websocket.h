@@ -53,12 +53,13 @@ bool ws_client_connect(struct ws_client_t *client);
 /**
  * Recieve data from the WebSocket Client and store the results in the out parameter.
  * This operation blocks.
+ * The caller is responsible for freeing the out variable.
  *
  * @param client The WebSocket Client.
  * @param[out] out The recieved data.
  * @return True if successful, False otherwise.
  */
-bool ws_client_recv(struct ws_client_t *client, char **out);
+bool ws_client_recv(struct ws_client_t *client, byte_array *out);
 /**
  * Free the internal WebSocket client data.
  *

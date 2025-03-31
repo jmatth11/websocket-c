@@ -2,6 +2,7 @@
 #include "unicode_str.h"
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #define _BV(x) (1 << (x))
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
@@ -126,6 +127,7 @@ size_t ws_frame_output_size(struct ws_frame_t *frame) {
 
 enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
                                     size_t len) {
+  printf("len = %zu\n", len);
   if (len == 0) {
     return WS_FRAME_ERROR_LEN;
   }
@@ -133,15 +135,22 @@ enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
   frame->codes.value = buf[0];
   frame->info.value = buf[1];
   frame->payload_len = frame->info.flags.payload_len;
+  printf("codes=%d, info=%d\n", frame->codes.value, frame->info.value);
+  if (frame->codes.flags.opcode >= OPCODE_CLOSE) {
+    return WS_FRAME_SUCCESS;
+  }
   enum ws_frame_error_t err = ws_frame_extended_len(frame, buf, len, &offset);
   if (err != WS_FRAME_SUCCESS) {
+    fprintf(stderr, "extended len failed.\n");
     return err;
   }
   err = ws_frame_extract_mask(frame, buf, len, &offset);
   if (err != WS_FRAME_SUCCESS) {
+    fprintf(stderr, "mask failed.\n");
     return err;
   }
   if (len < (offset + frame->payload_len)) {
+    fprintf(stderr, "payload len failed.\n");
     return WS_FRAME_ERROR_LEN;
   }
   if (!byte_array_init(&frame->payload, frame->payload_len)) {
