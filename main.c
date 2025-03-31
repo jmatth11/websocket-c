@@ -44,34 +44,24 @@ int main(int argc, char **argv) {
     }
     printf("response:\n");
     print_byte_array(&response);
-    //printf("\nframe:\n");
-    //struct ws_frame_t frame;
-    //if (!ws_frame_init(&frame)) {
-    //  fprintf(stderr, "frame failed to initialize.\n");
-    //  return 1;
-    //}
-    //size_t resp_len = strlen(response);
-    //byte_array buf;
-    //if (!byte_array_init(&buf, resp_len)) {
-    //  fprintf(stderr, "failed to init byte array.\n");
-    //  return 1;
-    //}
-    //for (size_t i = 0; i < resp_len; ++i) {
-    //  byte_array_insert(&buf, (uint8_t)response[i]);
-    //}
-    //enum ws_frame_error_t err = ws_frame_read(&frame, buf.byte_data, buf.len);
-    //if (err != WS_FRAME_SUCCESS) {
-    //  fprintf(stderr, "frame read failed: %d\n", err);
-    //  return 1;
-    //}
-    //// print_buf(response);
-    //if (frame.codes.flags.opcode >= OPCODE_CLOSE) {
-    //  printf("control frame: %d\n", frame.codes.flags.opcode);
-    //} else {
-    //  print_byte_array(&frame.payload);
-    //}
-    //ws_frame_free(&frame);
-    //byte_array_free(&buf);
+    printf("\nframe:\n");
+    struct ws_frame_t frame;
+    if (!ws_frame_init(&frame)) {
+      fprintf(stderr, "frame failed to initialize.\n");
+      return 1;
+    }
+    enum ws_frame_error_t err = ws_frame_read(&frame, response.byte_data, response.len);
+    if (err != WS_FRAME_SUCCESS) {
+      fprintf(stderr, "frame read failed: %d\n", err);
+      return 1;
+    }
+    // print_buf(response);
+    if (frame.codes.flags.opcode >= OPCODE_CLOSE) {
+      printf("control frame: %d\n", frame.codes.flags.opcode);
+    } else {
+      print_byte_array(&frame.payload);
+    }
+    ws_frame_free(&frame);
     byte_array_free(&response);
   }
   ws_client_free(&client);

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define _BV(x) (1 << (x))
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
 
 bool ws_frame_init(struct ws_frame_t *frame) {
@@ -76,7 +75,7 @@ ws_frame_write_len(struct ws_frame_t *frame, byte_array *out, size_t *offset) {
 static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
                                                    uint8_t *buf, size_t len,
                                                    size_t *offset) {
-  if (!frame->info.flags.mask) {
+  if (frame->info.flags.mask) {
     size_t idx = *offset;
     if (len < (idx + 4)) {
       return WS_FRAME_ERROR_LEN;
@@ -150,7 +149,7 @@ enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
     return err;
   }
   if (len < (offset + frame->payload_len)) {
-    fprintf(stderr, "payload len failed.\n");
+    fprintf(stderr, "payload len failed: %zu\n", (offset + frame->payload_len));
     return WS_FRAME_ERROR_LEN;
   }
   if (!byte_array_init(&frame->payload, frame->payload_len)) {
