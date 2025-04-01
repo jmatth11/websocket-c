@@ -138,7 +138,6 @@ bool ws_client_from_str(const char *url, size_t len,
   client->path = NULL;
   client->port = 80;
   client->version = 13;
-  client->__internal = NULL;
   const size_t prefix_len = strlen(WS_PREFIX);
   if (len <= prefix_len) {
     fprintf(stderr, "URL len was the same size or shorter than the expected "
@@ -184,7 +183,6 @@ bool ws_client_from_str(const char *url, size_t len,
     }
     client->path[path_len] = '\0';
   }
-  debug_client(client);
   return true;
 }
 
@@ -202,6 +200,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
   client->__internal->addr.sin_family = AF_INET;
   client->__internal->addr.sin_port = htons(client->port);
+  client->__internal->reader = ws_reader_create();
   if (inet_pton(AF_INET, client->host, &client->__internal->addr.sin_addr) !=
       1) {
     fprintf(stderr, "WebSocket Client host could not convert IP to addr.\n");
@@ -246,7 +245,7 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
 #ifdef DEBUG
-  printf("resp.len: %lu -- response: %s\n", strlen(response), response);
+  printf("resp.len: %lu -- response: %s\n", response.len, response.byte_data);
 #endif
   struct http_response_t resp;
   if (!http_response_init(&resp)) {
@@ -313,6 +312,14 @@ bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
   return memcpy(out->byte_data, buffer, n) != NULL;
 }
 
+bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
+  if (!ws_reader_handle(client->__internal->reader, client->__internal->socket)) {
+    return false;
+  }
+  *out = ws_reader_next_msg(client->__internal->reader);
+  return true;
+}
+
 /**
  * Free the internal WebSocket client data.
  *
@@ -330,5 +337,8 @@ void ws_client_free(struct ws_client_t *client) {
   if (client->__internal != NULL) {
     close(client->__internal->socket);
     free(client->__internal);
+    if (client->__internal->reader != NULL) {
+      ws_reader_destroy(client->__internal->reader);
+    }
   }
 }

@@ -26,13 +26,21 @@ int main(int argc, char **argv) {
     return 1;
   }
   while (1) {
-    char *response = NULL;
-    if (!ws_client_recv(&client, &response)) {
+    printf("waiting for messages...\n");
+    struct ws_message_t *msg = NULL;
+    if (!ws_client_next_msg(&client, &msg)) {
       fprintf(stderr, "client failed to recv.\n");
       break;
     }
-    // handle response.
-    free(response);
+    if (msg == NULL) {
+      fprintf(stderr, "message was null\n");
+      break;
+    }
+
+    // handle message here
+
+    ws_message_free(msg);
+    free(msg);
   }
   ws_client_free(&client);
   return 0;

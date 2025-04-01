@@ -3,17 +3,10 @@
 #include <string.h>
 
 #include "headers/protocol.h"
+#include "headers/reader.h"
 #include "headers/websocket.h"
 #include "unicode_str.h"
 
-static void print_buf(char *buf) {
-  const size_t len = strlen(buf);
-  printf("msg: ");
-  for (int i = 0; i < len; ++i) {
-    printf("%c", buf[i]);
-  }
-  printf("\n");
-}
 static void print_byte_array(byte_array *buf) {
   const size_t len = buf->len;
   printf("msg: ");
@@ -37,32 +30,19 @@ int main(int argc, char **argv) {
   }
   while (1) {
     printf("waiting for messages...\n");
-    byte_array response;
-    if (!ws_client_recv(&client, &response)) {
+    struct ws_message_t *msg = NULL;
+    if (!ws_client_next_msg(&client, &msg)) {
       fprintf(stderr, "client failed to recv.\n");
       break;
     }
-    printf("response:\n");
-    print_byte_array(&response);
-    printf("\nframe:\n");
-    struct ws_frame_t frame;
-    if (!ws_frame_init(&frame)) {
-      fprintf(stderr, "frame failed to initialize.\n");
-      return 1;
+    if (msg == NULL) {
+      fprintf(stderr, "message was null\n");
+      break;
     }
-    enum ws_frame_error_t err = ws_frame_read(&frame, response.byte_data, response.len);
-    if (err != WS_FRAME_SUCCESS) {
-      fprintf(stderr, "frame read failed: %d\n", err);
-      return 1;
-    }
-    // print_buf(response);
-    if (frame.codes.flags.opcode >= OPCODE_CLOSE) {
-      printf("control frame: %d\n", frame.codes.flags.opcode);
-    } else {
-      print_byte_array(&frame.payload);
-    }
-    ws_frame_free(&frame);
-    byte_array_free(&response);
+    printf("response(type:%d):\n", msg->type);
+    print_byte_array(&msg->body);
+    ws_message_free(msg);
+    free(msg);
   }
   ws_client_free(&client);
   return 0;

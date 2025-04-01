@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include "headers/protocol.h"
+#include "headers/reader.h"
 #include "unicode_str.h"
 
 struct __ws_client_internal_t;
@@ -28,6 +29,7 @@ struct ws_client_t {
    */
   unsigned short version;
 };
+
 /**
  * Create WebSocket client from the given URL.
  *
@@ -54,6 +56,8 @@ bool ws_client_connect(struct ws_client_t *client);
  * @return True if successful, False otherwise.
  */
 bool ws_client_recv(struct ws_client_t *client, byte_array *out);
+
+bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) __nonnull((1));
 /**
  * Free the internal WebSocket client data.
  *

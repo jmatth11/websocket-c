@@ -145,6 +145,8 @@ bool ws_frame_init(struct ws_frame_t *frame) __nonnull((1));
  */
 size_t ws_frame_output_size(struct ws_frame_t *frame) __nonnull((1));
 
+uint8_t ws_frame_payload_byte_len(struct ws_frame_t *frame) __nonnull((1));
+
 /**
  * Read WebSocket frame.
  *
@@ -156,6 +158,10 @@ size_t ws_frame_output_size(struct ws_frame_t *frame) __nonnull((1));
 enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
                                     size_t len) __nonnull((1, 2));
 
+enum ws_frame_error_t ws_frame_read_header(struct ws_frame_t *frame, uint8_t *buf,
+                                      size_t len) __nonnull((1, 2));
+enum ws_frame_error_t ws_frame_read_body(struct ws_frame_t *frame, uint8_t *buf,
+                                      size_t len) __nonnull((1, 2));
 /**
  * Write WebSocket frame.
  *
@@ -172,5 +178,7 @@ enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame, byte_array *out)
  * @param[in] frame The WebSocket frame structure.
  */
 void ws_frame_free(struct ws_frame_t *frame) __nonnull((1));
+
+void ws_frame_print(struct ws_frame_t *frame) __nonnull((1));
 
 #endif

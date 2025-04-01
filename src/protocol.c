@@ -1,8 +1,8 @@
 #include "headers/protocol.h"
 #include "unicode_str.h"
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
 
@@ -88,7 +88,8 @@ static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
 }
 
 /**
- * Handle transferring payload from src to dest and apply a masking key if supplied one.
+ * Handle transferring payload from src to dest and apply a masking key if
+ * supplied one.
  */
 static enum ws_frame_error_t ws_frame_handle_payload(bool mask,
                                                      uint8_t masking_key[4],
@@ -124,26 +125,52 @@ size_t ws_frame_output_size(struct ws_frame_t *frame) {
   return out_len + 8;
 }
 
+uint8_t ws_frame_payload_byte_len(struct ws_frame_t *frame) {
+  switch (frame->info.flags.payload_len) {
+  case 126:
+    return 2;
+  case 127:
+    return 8;
+  }
+  return 0;
+}
+
 enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
                                     size_t len) {
-  printf("len = %zu\n", len);
   if (len == 0) {
     return WS_FRAME_ERROR_LEN;
   }
-  size_t offset = 2;
+  enum ws_frame_error_t err = ws_frame_read_header(frame, buf, len);
+  if (err != WS_FRAME_SUCCESS) {
+    return err;
+  }
+  return ws_frame_read_body(frame, &buf[2], len - 2);
+}
+
+enum ws_frame_error_t ws_frame_read_header(struct ws_frame_t *frame,
+                                           uint8_t *buf, size_t len) {
+  if (len < 2) {
+    return WS_FRAME_ERROR_LEN;
+  }
   frame->codes.value = buf[0];
   frame->info.value = buf[1];
   frame->payload_len = frame->info.flags.payload_len;
-  printf("codes=%d, info=%d\n", frame->codes.value, frame->info.value);
-  if (frame->codes.flags.opcode >= OPCODE_CLOSE) {
-    return WS_FRAME_SUCCESS;
-  }
+  size_t offset = 2;
   enum ws_frame_error_t err = ws_frame_extended_len(frame, buf, len, &offset);
   if (err != WS_FRAME_SUCCESS) {
     fprintf(stderr, "extended len failed.\n");
     return err;
   }
-  err = ws_frame_extract_mask(frame, buf, len, &offset);
+  return WS_FRAME_SUCCESS;
+}
+
+enum ws_frame_error_t ws_frame_read_body(struct ws_frame_t *frame, uint8_t *buf,
+                                         size_t len) {
+  if (len == 0) {
+    return WS_FRAME_ERROR_LEN;
+  }
+  size_t offset = 0;
+  enum ws_frame_error_t err = ws_frame_extract_mask(frame, buf, len, &offset);
   if (err != WS_FRAME_SUCCESS) {
     fprintf(stderr, "mask failed.\n");
     return err;
@@ -204,4 +231,16 @@ enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame,
 void ws_frame_free(struct ws_frame_t *frame) {
   memset(frame, 0, sizeof(struct ws_frame_t));
   byte_array_free(&frame->payload);
+}
+
+void ws_frame_print(struct ws_frame_t *frame) {
+  printf("---frame:\n");
+  printf("fin:%d\n", frame->codes.flags.fin);
+  printf("rsv1:%d\n", frame->codes.flags.rsv1);
+  printf("rsv2:%d\n", frame->codes.flags.rsv2);
+  printf("rsv3:%d\n", frame->codes.flags.rsv3);
+  printf("opcode:%d\n", frame->codes.flags.opcode);
+  printf("mask:%d\n", frame->info.flags.mask);
+  printf("payload_len:%d\n", frame->info.flags.payload_len);
+  printf("---end frame:\n");
 }
