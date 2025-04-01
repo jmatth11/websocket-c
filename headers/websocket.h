@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "headers/protocol.h"
 #include "unicode_str.h"
 
 struct __ws_client_internal_t;
@@ -27,13 +28,6 @@ struct ws_client_t {
    */
   unsigned short version;
 };
-
-struct ws_message_t {
-  // TODO replace with proper protocol type
-  int type;
-  byte_array body;
-};
-
 /**
  * Create WebSocket client from the given URL.
  *

@@ -1,5 +1,6 @@
 #include "headers/websocket.h"
 #include "headers/http.h"
+#include "headers/reader.h"
 #include "unicode_str.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@ static char *empty_path = "/";
 struct __ws_client_internal_t {
   int socket;
   struct sockaddr_in addr;
+  struct ws_reader_t *reader;
 };
 
 #ifdef DEBUG
