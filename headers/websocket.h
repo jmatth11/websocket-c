@@ -30,6 +30,8 @@ struct ws_client_t {
   unsigned short version;
 };
 
+typedef bool(on_message_callback)(struct ws_client_t *client, struct ws_message_t *msg);
+
 /**
  * Create WebSocket client from the given URL.
  *
@@ -58,6 +60,8 @@ bool ws_client_connect(struct ws_client_t *client);
 bool ws_client_recv(struct ws_client_t *client, byte_array *out);
 
 bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) __nonnull((1));
+
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) __nonnull((1));
 /**
  * Free the internal WebSocket client data.
  *

@@ -320,6 +320,29 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
   return true;
 }
 
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
+  bool running = true;
+  while (running) {
+    struct ws_message_t *msg = NULL;
+    if (!ws_client_next_msg(client, &msg)) {
+      fprintf(stderr, "client failed to recv.\n");
+      break;
+    }
+    if (msg == NULL) {
+      fprintf(stderr, "message was null\n");
+      running = false;
+      break;
+    }
+    // TODO implement responses to PING and CLOSE message types
+    if (!cb(client, msg)) {
+      running = false;
+    }
+    ws_message_free(msg);
+    free(msg);
+  }
+  return true;
+}
+
 /**
  * Free the internal WebSocket client data.
  *
