@@ -1,5 +1,6 @@
 #include "headers/websocket.h"
 #include "headers/http.h"
+#include "headers/protocol.h"
 #include "headers/reader.h"
 #include "unicode_str.h"
 #include <stddef.h>
@@ -313,7 +314,8 @@ bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
 }
 
 bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
-  if (!ws_reader_handle(client->__internal->reader, client->__internal->socket)) {
+  if (!ws_reader_handle(client->__internal->reader,
+                        client->__internal->socket)) {
     return false;
   }
   *out = ws_reader_next_msg(client->__internal->reader);
@@ -322,6 +324,7 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
 
 bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
   bool running = true;
+  bool close_sock = false;
   while (running) {
     struct ws_message_t *msg = NULL;
     if (!ws_client_next_msg(client, &msg)) {
@@ -333,12 +336,32 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
       running = false;
       break;
     }
-    // TODO implement responses to PING and CLOSE message types
-    if (!cb(client, msg)) {
+    switch (msg->type) {
+    case OPCODE_CLOSE: {
       running = false;
+      close_sock = true;
+      break;
+    }
+    case OPCODE_PING: {
+      // TODO implement PONG response.
+      break;
+    }
+    case OPCODE_BIN:
+      /* fall through */
+    case OPCODE_TEXT: {
+      if (!cb(client, msg)) {
+        running = false;
+      }
+      break;
+    }
+    default:
+      break;
     }
     ws_message_free(msg);
     free(msg);
+  }
+  if (close_sock) {
+    ws_client_free(client);
   }
   return true;
 }
@@ -353,15 +376,18 @@ void ws_client_free(struct ws_client_t *client) {
     return;
   if (client->host != NULL) {
     free(client->host);
+    client->host = NULL;
   }
   if (client->path != NULL) {
     free(client->path);
+    client->path = NULL;
   }
   if (client->__internal != NULL) {
     close(client->__internal->socket);
-    free(client->__internal);
     if (client->__internal->reader != NULL) {
       ws_reader_destroy(client->__internal->reader);
     }
+    free(client->__internal);
+    client->__internal = NULL;
   }
 }
