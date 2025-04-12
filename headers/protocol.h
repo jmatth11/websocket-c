@@ -4,9 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
-#include "defs.h"
 #include "unicode_str.h"
 
 enum ws_frame_error_t {
@@ -61,6 +59,9 @@ enum ws_opcode_t {
   OPCODE_C_RES5 = 0xF,
 };
 
+/**
+ * WebSocket Frame structure.
+ */
 struct ws_frame_t {
   /**
    * The frame specific codes.
@@ -174,8 +175,24 @@ uint8_t ws_frame_payload_byte_len(struct ws_frame_t *frame) __nonnull((1));
 enum ws_frame_error_t ws_frame_read(struct ws_frame_t *frame, uint8_t *buf,
                                     size_t len) __nonnull((1, 2));
 
+/**
+ * Read the header from the given buffer into the WebSocket frame.
+ *
+ * @param[in/out] frame The WebSocket frame to populate.
+ * @param[in] buf The raw buffer of a WebSocket frame.
+ * @param[in] len The length of the given buffer.
+ * @return The ws_frame_error_t enum result, WS_FRAME_SUCCESS for success.
+ */
 enum ws_frame_error_t ws_frame_read_header(struct ws_frame_t *frame, uint8_t *buf,
                                       size_t len) __nonnull((1, 2));
+/**
+ * Read the body from the given buffer into the WebSocket frame.
+ *
+ * @param[in/out] frame The WebSocket frame to populate.
+ * @param[in] buf The raw buffer of a WebSocket frame.
+ * @param[in] len The length of the given buffer.
+ * @return The ws_frame_error_t enum result, WS_FRAME_SUCCESS for success.
+ */
 enum ws_frame_error_t ws_frame_read_body(struct ws_frame_t *frame, uint8_t *buf,
                                       size_t len) __nonnull((1, 2));
 /**
@@ -195,6 +212,11 @@ enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame, byte_array *out)
  */
 void ws_frame_free(struct ws_frame_t *frame) __nonnull((1));
 
+/**
+ * Print the given frame for debugging purposes.
+ *
+ * @param[in] frame The WebSocket frame.
+ */
 void ws_frame_print(struct ws_frame_t *frame) __nonnull((1));
 
 #endif

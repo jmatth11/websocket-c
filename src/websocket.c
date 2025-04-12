@@ -443,7 +443,7 @@ void ws_client_free(struct ws_client_t *client) {
   if (client->__internal != NULL) {
     close(client->__internal->socket);
     if (client->__internal->reader != NULL) {
-      ws_reader_destroy(client->__internal->reader);
+      ws_reader_destroy(&client->__internal->reader);
     }
     free(client->__internal);
     client->__internal = NULL;

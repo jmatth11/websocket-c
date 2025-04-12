@@ -143,10 +143,11 @@ struct ws_message_t* ws_reader_next_msg(struct ws_reader_t *reader) {
   return result;
 }
 
-void ws_reader_destroy(struct ws_reader_t *reader) {
-  simple_queue_destroy(reader->frame_queue);
-  simple_queue_destroy(reader->msg_queue);
-  free(reader);
+void ws_reader_destroy(struct ws_reader_t **reader) {
+  simple_queue_destroy((*reader)->frame_queue);
+  simple_queue_destroy((*reader)->msg_queue);
+  free(*reader);
+  *reader = NULL;
 }
 
 bool ws_message_init(struct ws_message_t *msg) {

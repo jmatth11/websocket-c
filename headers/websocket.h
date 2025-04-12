@@ -8,7 +8,14 @@
 #include "headers/reader.h"
 #include "unicode_str.h"
 
+/**
+ * Internal WebSocket client data.
+ */
 struct __ws_client_internal_t;
+
+/**
+ * WebSocket Client structure.
+ */
 struct ws_client_t {
   struct __ws_client_internal_t *__internal;
   /**
@@ -30,6 +37,14 @@ struct ws_client_t {
   unsigned short version;
 };
 
+/**
+ * Callback definition for a client's on_msg listener.
+ *
+ * @param[in] client The WebSocket client.
+ * @param[in] msg The WebSocket message from the server.
+ * @return True on success, false otherwise. False value also stops
+ *  the internal listener loop.
+ */
 typedef bool(on_message_callback)(struct ws_client_t *client,
                                   struct ws_message_t *msg);
 

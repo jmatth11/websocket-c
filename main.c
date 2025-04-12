@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "headers/protocol.h"
 #include "headers/reader.h"
 #include "headers/websocket.h"
 #include "unicode_str.h"
