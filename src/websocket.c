@@ -3,6 +3,7 @@
 #include "headers/protocol.h"
 #include "headers/reader.h"
 #include "unicode_str.h"
+#include "magic.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,26 @@ static inline void print_debug(struct ws_client_t *client) {
 #else
 #define debug_client(client)
 #endif
+
+/**
+ * Recieve data from the WebSocket Client and store the results in the out
+ * parameter. This operation blocks. The caller is responsible for freeing the
+ * out variable.
+ *
+ * @param client The WebSocket Client.
+ * @param[out] out The recieved data.
+ * @return True if successful, False otherwise.
+ */
+static bool ws_client_recv(struct ws_client_t *client, byte_array *out);
+
+static bool ws_client_write_blob(struct ws_client_t *client, byte_array *msg) {
+  ssize_t n = send(client->__internal->socket, msg->byte_data, msg->len, 0);
+  if (n == -1) {
+    fprintf(stderr, "WebSocket client send failure.\n");
+    return false;
+  }
+  return true;
+}
 
 static bool set_handshake_headers(struct http_request_t *req,
                                   struct ws_client_t *client) {
@@ -237,10 +258,9 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   free(req);
-  byte_array response;
+  byte_array DEFER(byte_array_free) response;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
-    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
@@ -251,7 +271,6 @@ bool ws_client_connect(struct ws_client_t *client) {
   struct http_response_t resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
-    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
@@ -262,7 +281,6 @@ bool ws_client_connect(struct ws_client_t *client) {
   if (!http_response_from_str(&resp, resp_cstr, response.len)) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
     free(resp_cstr);
-    byte_array_free(&response);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
@@ -343,7 +361,10 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
       break;
     }
     case OPCODE_PING: {
-      // TODO implement PONG response.
+      if (!ws_client_write(client, OPCODE_PONG, msg->body)) {
+        fprintf(stderr, "writing pong failed.\n");
+        running = false;
+      }
       break;
     }
     case OPCODE_BIN:
@@ -364,6 +385,43 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
     ws_client_free(client);
   }
   return true;
+}
+
+bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_array body) {
+  struct ws_frame_t DEFER(ws_frame_free) frame;
+  // always returns true
+  (void)ws_frame_init(&frame);
+  frame.codes.flags.opcode = type;
+  // TODO when we support fragmenting messages, make this conditional
+  frame.codes.flags.fin = 1;
+  // client is required to use a mask
+  frame.info.flags.mask = 1;
+  // always true
+  (void)ws_generate_mask(frame.masking_key, 4);
+  if (!byte_array_init(&frame.payload, body.len)) {
+    return false;
+  }
+  if (frame.payload.cap != body.len) {
+    // TODO send better error message
+    return false;
+  }
+  if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) == NULL) {
+    return false;
+  }
+  byte_array DEFER(byte_array_free) out;
+  memset(&out, 0, sizeof(byte_array));
+  enum ws_frame_error_t err = ws_frame_write(&frame, &out);
+  if (err != WS_FRAME_SUCCESS) {
+    return false;
+  }
+  if (!ws_client_write_blob(client, &out)) {
+    return false;
+  }
+  return true;
+}
+
+bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg) {
+  return ws_client_write(client, msg->type, msg->body);
 }
 
 /**

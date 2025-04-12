@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "defs.h"
 #include "unicode_str.h"
@@ -130,6 +131,15 @@ struct ws_frame_t {
 };
 
 /**
+ * Generate a mask and set it to the given uint8_t array.
+ *
+ * @param[in/out] mask The mask array to populate.
+ * @param[in] len The length of the mask.
+ * @return True for success, false otherwise.
+ */
+bool ws_generate_mask(uint8_t *mask, size_t len) __nonnull((1));
+
+/**
  * Initialize WebSocket Frame structure.
  *
  * @param[in] frame The WebSocket frame structure.
@@ -145,6 +155,12 @@ bool ws_frame_init(struct ws_frame_t *frame) __nonnull((1));
  */
 size_t ws_frame_output_size(struct ws_frame_t *frame) __nonnull((1));
 
+/**
+ * Get the byte length of the header payload value.
+ *
+ * @param[in] frame The WebSocket frame.
+ * @return The byte length.
+ */
 uint8_t ws_frame_payload_byte_len(struct ws_frame_t *frame) __nonnull((1));
 
 /**

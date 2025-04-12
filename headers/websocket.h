@@ -30,7 +30,8 @@ struct ws_client_t {
   unsigned short version;
 };
 
-typedef bool(on_message_callback)(struct ws_client_t *client, struct ws_message_t *msg);
+typedef bool(on_message_callback)(struct ws_client_t *client,
+                                  struct ws_message_t *msg);
 
 /**
  * Create WebSocket client from the given URL.
@@ -40,7 +41,8 @@ typedef bool(on_message_callback)(struct ws_client_t *client, struct ws_message_
  * @param client The WebSocket Client to populate.
  * @return True if successful, False otherwise.
  */
-bool ws_client_from_str(const char *url, size_t len, struct ws_client_t *client);
+bool ws_client_from_str(const char *url, size_t len,
+                        struct ws_client_t *client);
 /**
  * Establish a connection with the given WebSocket.
  *
@@ -48,20 +50,54 @@ bool ws_client_from_str(const char *url, size_t len, struct ws_client_t *client)
  * @return True if successful, False otherwise.
  */
 bool ws_client_connect(struct ws_client_t *client);
+
 /**
- * Recieve data from the WebSocket Client and store the results in the out parameter.
- * This operation blocks.
- * The caller is responsible for freeing the out variable.
+ * Listen for the next WebSocket message for the client and populate the out
+ * message param. By default, this function blocks while waiting for a message.
  *
- * @param client The WebSocket Client.
- * @param[out] out The recieved data.
- * @return True if successful, False otherwise.
+ * @param[in] client The WebSocket client.
+ * @param[out] out The WebSocket message.
+ * @return True on success, False otherwise.
  */
-bool ws_client_recv(struct ws_client_t *client, byte_array *out);
+bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out)
+    __nonnull((1));
 
-bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) __nonnull((1));
+/**
+ * Set a callback to be a listener for the client's WebSocket messages.
+ * By default, this function blocks until the internal loop exits.
+ * This function handles responding to PING and CLOSE messages.
+ *
+ * Return false within the callback to exit the internal loop.
+ *
+ * @param[in] client The WebSocket client.
+ * @param[in] cb The callback function.
+ * @return True on successful exit, False otherwise.
+ */
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb)
+    __nonnull((1));
 
-bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) __nonnull((1));
+/**
+ * Write a message out to the server.
+ *
+ * @param[in] client The WebSocket client.
+ * @param[in] type The OPCODE type of the message.
+ * @param[in] body The body of the message.
+ * @return True on success, False otherwise.
+ */
+bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type,
+                     byte_array body) __nonnull((1));
+
+/**
+ * Write a message out to the server.
+ *
+ * @param[in] client The WebSocket client.
+ * @param[in] type The OPCODE type of the message.
+ * @param[in] body The body of the message.
+ * @return True on success, False otherwise.
+ */
+bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg)
+    __nonnull((1, 2));
+
 /**
  * Free the internal WebSocket client data.
  *
