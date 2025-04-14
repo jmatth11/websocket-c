@@ -144,8 +144,8 @@ struct ws_message_t* ws_reader_next_msg(struct ws_reader_t *reader) {
 }
 
 void ws_reader_destroy(struct ws_reader_t **reader) {
-  simple_queue_destroy((*reader)->frame_queue);
-  simple_queue_destroy((*reader)->msg_queue);
+  simple_queue_destroy(&(*reader)->frame_queue);
+  simple_queue_destroy(&(*reader)->msg_queue);
   free(*reader);
   *reader = NULL;
 }

@@ -8,6 +8,7 @@
 #include "hash_map.h"
 #include "string_ops.h"
 #include "unicode_str.h"
+#include "magic.h"
 
 const char *http_method_get_string(enum http_method_t method) {
   switch (method) {
@@ -47,21 +48,17 @@ enum http_method_t http_method_get_enum(const char *method) {
 
 static char * normalized_cstr(const char *str, size_t len) {
   size_t str_len = strlen(str);
-  struct unicode_str_t *uni_str = unicode_str_create();
+  struct unicode_str_t DEFER(unicode_str_destroy) *uni_str = unicode_str_create();
   if (unicode_str_set_char(uni_str, str, str_len) < str_len) {
     fprintf(stderr, "failed to set header during unicode conversion.\n");
-    unicode_str_destroy(uni_str);
     return false;
   }
-  struct unicode_str_t *new_str = unicode_str_to_lower(uni_str);
+  struct unicode_str_t DEFER(unicode_str_destroy) *new_str = unicode_str_to_lower(uni_str);
   if (new_str == NULL) {
     fprintf(stderr, "failed to generate normalized str for header.\n");
-    unicode_str_destroy(uni_str);
     return false;
   }
   char *normalized_str = unicode_str_to_cstr(new_str);
-  unicode_str_destroy(uni_str);
-  unicode_str_destroy(new_str);
   return normalized_str;
 }
 
@@ -94,13 +91,14 @@ static void http_message_free(struct http_message_t *msg) {
     msg->protocol = NULL;
   }
   msg->method = HTTP_INVALID_METHOD;
-  hash_map_destroy(msg->headers, true);
+  hash_map_destroy(&msg->headers, true);
   byte_array_free(&msg->body);
 }
 
 bool http_message_set_header(struct http_message_t *msg, const char *key,
                              char *value) {
   size_t key_len = strlen(key);
+  // TODO use DEFER
   char *normalized_key = normalized_cstr(key, key_len);
   // free previous value.
   char *out = NULL;
@@ -122,6 +120,7 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
 bool http_message_get_header(struct http_message_t *msg, const char *key,
                              char **out) {
   size_t key_len = strlen(key);
+  // TODO use DEFER
   char *normalized_key = normalized_cstr(key, key_len);
 #ifdef DEBUG
   printf("normalized_key= \"%s\"\n", normalized_key);
@@ -256,7 +255,7 @@ bool http_response_from_str(struct http_response_t *r, const char *str,
 }
 
 char *http_response_to_str(struct http_response_t *r) {
-  base_str result;
+  base_str DEFER(free_base_str) result;
   if (new_base_str(&result, 20) != C_STR_NO_ERROR) {
     fprintf(stderr, "failed to generate response string.\n");
     return false;
@@ -276,7 +275,6 @@ char *http_response_to_str(struct http_response_t *r) {
   }
   char *out = NULL;
   if (result.get_str(&result, &out) != C_STR_NO_ERROR) {
-    free_base_str(&result);
     return NULL;
   }
   // we don't free the result object because we send the internal data out to
@@ -344,7 +342,7 @@ char *http_request_to_str(struct http_request_t *r) {
     fprintf(stderr, "missing required properties.\n");
     return NULL;
   }
-  base_str result;
+  base_str DEFER(free_base_str) result;
   if (new_base_str(&result, 20) != C_STR_NO_ERROR) {
     fprintf(stderr, "failed to generate response string.\n");
     return false;
@@ -358,13 +356,13 @@ char *http_request_to_str(struct http_request_t *r) {
   result.append(&result, "\r\n", 2);
 
   size_t host_len = snprintf(NULL, 0, "%s:%d", r->message.host, r->message.port) + 1;
+  // TODO handle with DEFER
   char *host = malloc((sizeof(char)*host_len) + 1);
   host_len = snprintf(host, host_len, "%s:%d", r->message.host, r->message.port);
   host[host_len] = '\0';
   if (!http_request_set_header(r, "Host", host)) {
     fprintf(stderr, "failed to set host header in request.\n");
     free(host);
-    free_base_str(&result);
   }
   free(host);
 
