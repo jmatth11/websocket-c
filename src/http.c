@@ -98,8 +98,7 @@ static void http_message_free(struct http_message_t *msg) {
 bool http_message_set_header(struct http_message_t *msg, const char *key,
                              char *value) {
   size_t key_len = strlen(key);
-  // TODO use DEFER
-  char *normalized_key = normalized_cstr(key, key_len);
+  char AUTO_C *normalized_key = normalized_cstr(key, key_len);
   // free previous value.
   char *out = NULL;
   http_message_get_header(msg, key, &out);
@@ -110,27 +109,22 @@ bool http_message_set_header(struct http_message_t *msg, const char *key,
   if (!hash_map_set(msg->headers, normalized_key,
                     str_dup(value, strlen(value)))) {
     fprintf(stderr, "failed to set header.\n");
-    free(normalized_key);
     return false;
   }
-  free(normalized_key);
   return true;
 }
 
 bool http_message_get_header(struct http_message_t *msg, const char *key,
                              char **out) {
   size_t key_len = strlen(key);
-  // TODO use DEFER
-  char *normalized_key = normalized_cstr(key, key_len);
+  char AUTO_C *normalized_key = normalized_cstr(key, key_len);
 #ifdef DEBUG
   printf("normalized_key= \"%s\"\n", normalized_key);
   fflush(stdout);
 #endif
   if (!hash_map_get(msg->headers, normalized_key, (void **)out)) {
-    free(normalized_key);
     return false;
   }
-  free(normalized_key);
   return true;
 }
 
@@ -149,7 +143,7 @@ bool http_message_from_str(struct http_message_t *msg, const char *str,
       break;
     }
     size_t key_len = strcspn(&str[index], ":");
-    char *key = str_dup(&str[index], key_len);
+    char AUTO_C *key = str_dup(&str[index], key_len);
 #ifdef DEBUG
     printf("key=\"%s\"\n", key);
     fflush(stdout);
@@ -157,19 +151,15 @@ bool http_message_from_str(struct http_message_t *msg, const char *str,
     // plus 2 for : and following space.
     index += key_len + 2;
     size_t value_len = strcspn(&str[index], "\r");
-    char *value = str_dup(&str[index], value_len);
+    char AUTO_C *value = str_dup(&str[index], value_len);
 #ifdef DEBUG
     printf("value=\"%s\"\n", value);
     fflush(stdout);
 #endif
     if (!http_message_set_header(msg, key, value)) {
-      free(key);
-      free(value);
       fprintf(stderr, "failed to set header.\n");
       return false;
     }
-    free(key);
-    free(value);
     // plus 2 for \r\n at the end of the value.
     index += value_len + 2;
   }
@@ -293,6 +283,9 @@ bool http_response_get_header(struct http_response_t *r, const char *key,
 }
 
 void http_response_free(struct http_response_t *r) {
+  if (r == NULL) {
+    return;
+  }
   http_message_free(&r->message);
 }
 
@@ -356,15 +349,12 @@ char *http_request_to_str(struct http_request_t *r) {
   result.append(&result, "\r\n", 2);
 
   size_t host_len = snprintf(NULL, 0, "%s:%d", r->message.host, r->message.port) + 1;
-  // TODO handle with DEFER
-  char *host = malloc((sizeof(char)*host_len) + 1);
+  char AUTO_C *host = malloc((sizeof(char)*host_len) + 1);
   host_len = snprintf(host, host_len, "%s:%d", r->message.host, r->message.port);
   host[host_len] = '\0';
   if (!http_request_set_header(r, "Host", host)) {
     fprintf(stderr, "failed to set host header in request.\n");
-    free(host);
   }
-  free(host);
 
   if (!http_message_to_str(&r->message, &result)) {
     fprintf(stderr, "failed to write out http message structure.\n");
@@ -414,5 +404,8 @@ bool http_request_write(struct http_request_t *r, const uint8_t *buf,
 }
 
 void http_request_free(struct http_request_t *r) {
+  if (r == NULL) {
+    return;
+  }
   http_message_free(&r->message);
 }

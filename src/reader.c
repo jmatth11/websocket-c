@@ -144,6 +144,9 @@ struct ws_message_t* ws_reader_next_msg(struct ws_reader_t *reader) {
 }
 
 void ws_reader_destroy(struct ws_reader_t **reader) {
+  if (*reader == NULL) {
+    return;
+  }
   simple_queue_destroy(&(*reader)->frame_queue);
   simple_queue_destroy(&(*reader)->msg_queue);
   free(*reader);
@@ -155,6 +158,9 @@ bool ws_message_init(struct ws_message_t *msg) {
   return byte_array_init(&msg->body, 1);
 };
 void ws_message_free(struct ws_message_t *msg) {
+  if (msg == NULL) {
+    return;
+  }
   byte_array_free(&msg->body);
 }
 

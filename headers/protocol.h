@@ -210,7 +210,7 @@ enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame, byte_array *out)
  *
  * @param[in] frame The WebSocket frame structure.
  */
-void ws_frame_free(struct ws_frame_t *frame) __nonnull((1));
+void ws_frame_free(struct ws_frame_t *frame);
 
 /**
  * Print the given frame for debugging purposes.

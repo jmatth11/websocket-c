@@ -96,20 +96,17 @@ static bool set_handshake_headers(struct http_request_t *req,
   // length
   size_t version_len = snprintf(NULL, 0, "%d", client->version) + 1;
   // add extra 1 for null-terminator
-  char *version = malloc((sizeof(char) * version_len) + 1);
+  char AUTO_C *version = malloc((sizeof(char) * version_len) + 1);
   version_len = snprintf(version, version_len, "%d", client->version);
   version[version_len] = '\0';
   if (version_len == 0) {
     fprintf(stderr, "failed to convert version to string.\n");
-    free(version);
     return false;
   }
   if (!http_request_set_header(req, "Sec-WebSocket-Version", version)) {
     fprintf(stderr, "failed to set request header.\n");
-    free(version);
     return false;
   }
-  free(version);
   return true;
 }
 
@@ -121,7 +118,7 @@ static char *initial_handshake(struct ws_client_t *client) {
   if (client->path != NULL) {
     path = client->path;
   }
-  struct http_request_t req;
+  struct http_request_t DEFER(http_request_free) req;
   if (!http_request_init(&req)) {
     fprintf(stderr, "failed to initialize HTTP request structure.\n");
     return NULL;
@@ -135,14 +132,12 @@ static char *initial_handshake(struct ws_client_t *client) {
     req.message.protocol = NULL;
     req.message.path = NULL;
     req.message.host = NULL;
-    http_request_free(&req);
     return NULL;
   }
   char *result = http_request_to_str(&req);
   req.message.protocol = NULL;
   req.message.path = NULL;
   req.message.host = NULL;
-  http_request_free(&req);
   return result;
 }
 
@@ -239,7 +234,7 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   client->__internal->socket = sock;
-  char *req = initial_handshake(client);
+  char AUTO_C *req = initial_handshake(client);
   if (req == NULL) {
     fprintf(stderr, "WebSocket client failed to create handshake.\n");
     close(client->__internal->socket);
@@ -252,12 +247,10 @@ bool ws_client_connect(struct ws_client_t *client) {
   ssize_t n = send(sock, req, strlen(req), 0);
   if (n == -1) {
     fprintf(stderr, "message wasn't sent\n");
-    free(req);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  free(req);
   byte_array DEFER(byte_array_free) response;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
@@ -268,30 +261,26 @@ bool ws_client_connect(struct ws_client_t *client) {
 #ifdef DEBUG
   printf("resp.len: %lu -- response: %s\n", response.len, response.byte_data);
 #endif
-  struct http_response_t resp;
+  struct http_response_t DEFER(http_response_free) resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  char *resp_cstr = malloc((sizeof(char) * response.len) + 1);
+  char AUTO_C *resp_cstr = malloc((sizeof(char) * response.len) + 1);
   memcpy(resp_cstr, response.byte_data, response.len);
   resp_cstr[response.len] = '\0';
   if (!http_response_from_str(&resp, resp_cstr, response.len)) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
-    free(resp_cstr);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  free(resp_cstr);
-  byte_array_free(&response);
   // TODO support dynamic generation of Accept value
   char *noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
     fprintf(stderr, "failed to get HTTP response header value.\n");
-    http_response_free(&resp);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
@@ -299,12 +288,10 @@ bool ws_client_connect(struct ws_client_t *client) {
   if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
-    http_response_free(&resp);
     close(client->__internal->socket);
     free(client->__internal);
     return false;
   }
-  http_response_free(&resp);
   return true;
 }
 
@@ -430,8 +417,9 @@ bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg) {
  * @param client The WebSocket Client.
  */
 void ws_client_free(struct ws_client_t *client) {
-  if (client == NULL)
+  if (client == NULL) {
     return;
+  }
   if (client->host != NULL) {
     free(client->host);
     client->host = NULL;

@@ -179,7 +179,7 @@ bool http_response_get_header(struct http_response_t *r, const char *key,
  *
  * @param[in] r The HTTP response structure.
  */
-void http_response_free(struct http_response_t *r) __nonnull((1));
+void http_response_free(struct http_response_t *r);
 
 /// HTTP Request functions.
 
@@ -262,6 +262,6 @@ bool http_request_write(struct http_request_t *r, const uint8_t *buf,
  *
  * @param[in] r The HTTP request structure.
  */
-void http_request_free(struct http_request_t *r) __nonnull((1));
+void http_request_free(struct http_request_t *r);
 
 #endif

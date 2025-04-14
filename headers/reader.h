@@ -75,6 +75,6 @@ bool ws_message_init(struct ws_message_t *msg) __nonnull((1));
  *
  * @param[in] msg The WebSocket Message.
  */
-void ws_message_free(struct ws_message_t *msg) __nonnull((1));
+void ws_message_free(struct ws_message_t *msg);
 
 #endif

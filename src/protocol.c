@@ -240,6 +240,9 @@ enum ws_frame_error_t ws_frame_write(struct ws_frame_t *frame,
 }
 
 void ws_frame_free(struct ws_frame_t *frame) {
+  if (frame == NULL) {
+    return;
+  }
   memset(frame, 0, sizeof(struct ws_frame_t));
   byte_array_free(&frame->payload);
 }
