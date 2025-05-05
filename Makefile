@@ -8,6 +8,9 @@ TARGET=main
 ifeq ($(DEBUG), 1)
 	CFLAGS += -DDEBUG=1 -ggdb
 endif
+ifeq ($(RELEASE), 1)
+	CFLAGS += -O2
+endif
 ifeq ($(SHARED), 1)
 	SOURCES=$(shell find ./src -name '*.c')
 	TARGET=libws
@@ -31,12 +34,6 @@ endif
 $(OBJ)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) -c -fPIC -o $@ $< $(CFLAGS) $(INCLUDES)
-
-.PHONY: archive
-archive: $(filter-out %main.o,$(OBJECTS))
-	@mkdir -p $(BIN)
-	$(CC) -shared -fPIC -o $(BIN)/$(SHARED) $^ $(LIBS)
-	ar -rcs $(BIN)/$(ARCHIVE) $^
 
 .PHONY: clean
 clean:

@@ -1,5 +1,6 @@
 main
 .zig-cache
+zig-out
 deps/
 obj
 bin
