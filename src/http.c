@@ -264,7 +264,7 @@ char *http_response_to_str(struct http_response_t *r) {
     return NULL;
   }
   char *out = NULL;
-  if (result.get_str(&result, &out) != C_STR_NO_ERROR) {
+  if (result.copy(&result, &out) != C_STR_NO_ERROR) {
     return NULL;
   }
   // we don't free the result object because we send the internal data out to
@@ -362,7 +362,7 @@ char *http_request_to_str(struct http_request_t *r) {
     return NULL;
   }
   char *out = NULL;
-  if (result.get_str(&result, &out) != C_STR_NO_ERROR) {
+  if (result.copy(&result, &out) != C_STR_NO_ERROR) {
     free_base_str(&result);
     return NULL;
   }
