@@ -1,9 +1,14 @@
 #include "headers/protocol.h"
 #include "unicode_str.h"
+#include <emmintrin.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#ifdef __SSE2__
+#include <immintrin.h>
+#endif
 
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
 
@@ -98,6 +103,54 @@ static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
   return WS_FRAME_SUCCESS;
 }
 
+static enum ws_frame_error_t ws_frame_handle_payload_serial(uint8_t masking_key[4],
+                                                     uint8_t *restrict dest,
+                                                     uint8_t *restrict src,
+                                                     size_t len, size_t offset) {
+  for (size_t index=offset; index < len; index++) {
+      dest[index] = src[index] ^ masking_key[index & 3];
+  }
+  return WS_FRAME_SUCCESS;
+}
+
+#ifdef __SSE2__
+// TODO verify this function.
+static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4],
+                                                     uint8_t *restrict dest,
+                                                     uint8_t *restrict src,
+                                                     size_t len) {
+  // operate on 16 bytes at a time.
+  size_t offset = 15;
+  // if it's less than 16 bytes we will operate on them individually
+  const size_t cutoff = len - 16;
+  const uint8_t m1 = masking_key[0];
+  const uint8_t m2 = masking_key[1];
+  const uint8_t m3 = masking_key[2];
+  const uint8_t m4 = masking_key[3];
+  // repeat the mask 4 times.
+  __m128i mask_simd = _mm_set_epi8(
+    m4, m3, m2, m1,
+    m4, m3, m2, m1,
+    m4, m3, m2, m1,
+    m4, m3, m2, m1
+  );
+
+  while (offset < cutoff) {
+    __m128i vec1 = _mm_set_epi8(
+      src[offset], src[offset - 1], src[offset - 2], src[offset - 3],
+      src[offset - 4], src[offset - 5], src[offset - 6], src[offset - 7],
+      src[offset - 8], src[offset - 9], src[offset - 10], src[offset - 11],
+      src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]
+    );
+    __m128i result = _mm_xor_si128(vec1, mask_simd);
+    _mm_storeu_si128((__m128i*)&dest[offset - 15], result);
+    offset += 16;
+  }
+  // convert the remaining bytes.
+  return ws_frame_handle_payload_serial(masking_key, dest, src, len, offset);
+}
+#endif
+
 /**
  * Handle transferring payload from src to dest and apply a masking key if
  * supplied one.
@@ -107,19 +160,19 @@ static enum ws_frame_error_t ws_frame_handle_payload(bool mask,
                                                      uint8_t *restrict dest,
                                                      uint8_t *restrict src,
                                                      size_t len) {
+  enum ws_frame_error_t result = WS_FRAME_SUCCESS;
   if (!mask) {
     for (size_t i = 0; i < len; ++i) {
       dest[i] = src[i];
     }
   } else {
-    // this is a simple iteration with the mask
-    // investigate simd instructions
-    for (size_t i = 0; i < len; ++i) {
-      // xor byte with mask. iterate through key as we count through the bytes.
-      dest[i] = src[i] ^ masking_key[i & 3];
-    }
+#ifdef __SSE2__
+    result = ws_frame_handle_payload_simd(masking_key, dest, src, len);
+#else
+    result = ws_frame_handle_payload_serial(masking_key, dest, src, len, 0);
+#endif
   }
-  return WS_FRAME_SUCCESS;
+  return result;
 }
 
 size_t ws_frame_output_size(struct ws_frame_t *frame) {
