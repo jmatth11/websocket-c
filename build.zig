@@ -5,7 +5,7 @@ fn createModule(b: *std.Build, optimize: std.builtin.OptimizeMode, target: std.B
         "src/websocket.c",
         "src/http.c",
         "src/reader.c",
-        "src/websocket.c",
+        "src/protocol.c",
     };
     const flags: []const []const u8 = &.{
         "-Wall",
