@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "headers/protocol.h"
-#include "headers/reader.h"
+#include "protocol.h"
+#include "reader.h"
 #include "unicode_str.h"
 
 /**
