@@ -141,6 +141,14 @@ static char *initial_handshake(struct ws_client_t *client) {
   return result;
 }
 
+bool ws_client_init(struct ws_client_t* client) {
+  client->host = NULL;
+  client->path = NULL;
+  client->port = 80;
+  client->version = 13;
+  client->__internal = NULL;
+}
+
 /**
  * Create WebSocket client from the given URL.
  *

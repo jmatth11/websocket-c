@@ -49,6 +49,13 @@ typedef bool(on_message_callback)(struct ws_client_t *client,
                                   struct ws_message_t *msg);
 
 /**
+ * Initialize ws_client_t with all default values.
+ * @param client The WebSocket client.
+ * @return True on success, false otherwise.
+ */
+bool ws_client_init(struct ws_client_t* client);
+
+/**
  * Create WebSocket client from the given URL.
  *
  * @param url The URL to parse.
