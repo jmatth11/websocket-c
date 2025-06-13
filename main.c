@@ -26,6 +26,7 @@ static bool callback(struct ws_client_t *client, struct ws_message_t *msg) {
 
 int main(int argc, char **argv) {
   struct ws_client_t client;
+  ws_client_init(&client);
   if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
     fprintf(stderr, "client from string URL failed.\n");
     return 1;
