@@ -147,6 +147,7 @@ bool ws_client_init(struct ws_client_t* client) {
   client->port = 80;
   client->version = 13;
   client->__internal = NULL;
+  return true;
 }
 
 /**
