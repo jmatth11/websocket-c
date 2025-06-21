@@ -394,15 +394,17 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_arr
   frame.info.flags.mask = 1;
   // always true
   (void)ws_generate_mask(frame.masking_key, 4);
-  if (!byte_array_init(&frame.payload, body.len)) {
-    return false;
-  }
-  if (frame.payload.cap != body.len) {
-    // TODO send better error message
-    return false;
-  }
-  if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) == NULL) {
-    return false;
+  if (body.len > 0) {
+    if (!byte_array_init(&frame.payload, body.len)) {
+      return false;
+    }
+    if (frame.payload.cap != body.len) {
+      // TODO send better error message
+      return false;
+    }
+    if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) == NULL) {
+      return false;
+    }
   }
   byte_array DEFER(byte_array_free) out;
   memset(&out, 0, sizeof(byte_array));

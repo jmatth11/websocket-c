@@ -63,6 +63,8 @@ bool ws_reader_handle(struct ws_reader_t *reader, int socket) {
   ssize_t n = recv(socket, header, 10, MSG_PEEK);
   if (n == -1) {
     return false;
+  } else if (n == 0) {
+    return true;
   }
 #ifdef DEBUG
   printf("header=%s\n", header);

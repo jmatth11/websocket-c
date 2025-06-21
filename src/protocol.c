@@ -106,12 +106,15 @@ static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
   return WS_FRAME_SUCCESS;
 }
 
-static enum ws_frame_error_t ws_frame_handle_payload_serial(uint8_t masking_key[4],
-                                                     uint8_t *restrict dest,
-                                                     uint8_t *restrict src,
-                                                     size_t len, size_t offset) {
-  for (size_t index=offset; index < len; index++) {
-      dest[index] = src[index] ^ masking_key[index & 3];
+static enum ws_frame_error_t
+ws_frame_handle_payload_serial(uint8_t masking_key[4], uint8_t *restrict dest,
+                               uint8_t *restrict src, size_t len,
+                               size_t offset) {
+  if (len == 0) {
+    return WS_FRAME_SUCCESS;
+  }
+  for (size_t index = offset; index < len; index++) {
+    dest[index] = src[index] ^ masking_key[index & 3];
   }
   return WS_FRAME_SUCCESS;
 }
@@ -121,10 +124,12 @@ static enum ws_frame_error_t ws_frame_handle_payload_serial(uint8_t masking_key[
 /**
  * ARM SIMD implementation of mask handling.
  */
-static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4],
-                                                     uint8_t *restrict dest,
-                                                     uint8_t *restrict src,
-                                                     size_t len) {
+static enum ws_frame_error_t
+ws_frame_handle_payload_simd(uint8_t masking_key[4], uint8_t *restrict dest,
+                             uint8_t *restrict src, size_t len) {
+  if (len == 0) {
+    return WS_FRAME_SUCCESS;
+  }
   // operate on 16 bytes at a time.
   size_t offset = 15;
   // if it's less than 16 bytes we will operate on them individually
@@ -134,23 +139,18 @@ static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4]
   const uint8_t m3 = masking_key[2];
   const uint8_t m4 = masking_key[3];
   // repeat the mask 4 times.
-  const uint8_t mask_buf[16] = {
-    m4, m3, m2, m1,
-    m4, m3, m2, m1,
-    m4, m3, m2, m1,
-    m4, m3, m2, m1
-  };
+  const uint8_t mask_buf[16] = {m4, m3, m2, m1, m4, m3, m2, m1,
+                                m4, m3, m2, m1, m4, m3, m2, m1};
   // load mask into register
   uint8x16_t mask_simd = vld1q_u8(mask_buf);
 
   while (offset < cutoff) {
     // loading them in reverse order so we can store them directly.
     const uint8_t vec_buf = {
-      src[offset], src[offset - 1], src[offset - 2], src[offset - 3],
-      src[offset - 4], src[offset - 5], src[offset - 6], src[offset - 7],
-      src[offset - 8], src[offset - 9], src[offset - 10], src[offset - 11],
-      src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]
-    };
+        src[offset],      src[offset - 1],  src[offset - 2],  src[offset - 3],
+        src[offset - 4],  src[offset - 5],  src[offset - 6],  src[offset - 7],
+        src[offset - 8],  src[offset - 9],  src[offset - 10], src[offset - 11],
+        src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]};
     uint8x16_t vec1 = vld1q_u8(vec_buf);
     uint8x16_t result = veorq_u8(vec1, mask_simd);
     vst1q_u8(&dest[offset - 15], result);
@@ -163,10 +163,12 @@ static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4]
 /**
  * Intel SIMD implementation of mask handling.
  */
-static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4],
-                                                     uint8_t *restrict dest,
-                                                     uint8_t *restrict src,
-                                                     size_t len) {
+static enum ws_frame_error_t
+ws_frame_handle_payload_simd(uint8_t masking_key[4], uint8_t *restrict dest,
+                             uint8_t *restrict src, size_t len) {
+  if (len == 0) {
+    return WS_FRAME_SUCCESS;
+  }
   // operate on 16 bytes at a time.
   size_t offset = 15;
   // if it's less than 16 bytes we will operate on them individually
@@ -176,23 +178,18 @@ static enum ws_frame_error_t ws_frame_handle_payload_simd(uint8_t masking_key[4]
   const uint8_t m3 = masking_key[2];
   const uint8_t m4 = masking_key[3];
   // repeat the mask 4 times.
-  __m128i mask_simd = _mm_set_epi8(
-    m4, m3, m2, m1,
-    m4, m3, m2, m1,
-    m4, m3, m2, m1,
-    m4, m3, m2, m1
-  );
+  __m128i mask_simd = _mm_set_epi8(m4, m3, m2, m1, m4, m3, m2, m1, m4, m3, m2,
+                                   m1, m4, m3, m2, m1);
 
   while (offset < cutoff) {
     // loading them in reverse order so we can store them directly.
     __m128i vec1 = _mm_set_epi8(
-      src[offset], src[offset - 1], src[offset - 2], src[offset - 3],
-      src[offset - 4], src[offset - 5], src[offset - 6], src[offset - 7],
-      src[offset - 8], src[offset - 9], src[offset - 10], src[offset - 11],
-      src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]
-    );
+        src[offset], src[offset - 1], src[offset - 2], src[offset - 3],
+        src[offset - 4], src[offset - 5], src[offset - 6], src[offset - 7],
+        src[offset - 8], src[offset - 9], src[offset - 10], src[offset - 11],
+        src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]);
     __m128i result = _mm_xor_si128(vec1, mask_simd);
-    _mm_storeu_si128((__m128i*)&dest[offset - 15], result);
+    _mm_storeu_si128((__m128i *)&dest[offset - 15], result);
     offset += 16;
   }
   // convert the remaining bytes.
@@ -210,6 +207,9 @@ static enum ws_frame_error_t ws_frame_handle_payload(bool mask,
                                                      uint8_t *restrict src,
                                                      size_t len) {
   enum ws_frame_error_t result = WS_FRAME_SUCCESS;
+  if (len == 0) {
+    return result;
+  }
   if (!mask) {
     for (size_t i = 0; i < len; ++i) {
       dest[i] = src[i];
