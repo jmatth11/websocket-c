@@ -92,8 +92,23 @@ bool ws_reader_handle(struct ws_reader_t *reader, int socket) {
   printf("reading from socket\n");
 #endif
   n = recv(socket, buffer, msg_len, 0);
+  if (n == -1 && frame->codes.flags.opcode == OPCODE_CLOSE) {
+    frame->payload.byte_data = NULL;
+    frame->payload.len = 0;
+    frame->payload_len = 0;
+    struct ws_message_t *msg = malloc(sizeof(struct ws_message_t));
+    msg->type = frame->codes.flags.opcode;
+    msg->body = frame->payload;
+    if (!simple_queue_push(reader->msg_queue, msg)) {
+      free(msg);
+      ws_frame_free(frame);
+      free(frame);
+      return false;
+    }
+    return true;
+  }
   if (n != msg_len) {
-    fprintf(stderr, "socket read did not match message length: n=%zu; msg_len:%zu\n", n, msg_len);
+    fprintf(stderr, "socket read did not match message length: n=%ld; msg_len:%zu\n", n, msg_len);
     ws_frame_free(frame);
     free(frame);
     return false;
@@ -163,6 +178,8 @@ void ws_message_free(struct ws_message_t *msg) {
   if (msg == NULL) {
     return;
   }
-  byte_array_free(&msg->body);
+  if (msg->body.byte_data != NULL) {
+    byte_array_free(&msg->body);
+  }
 }
 
