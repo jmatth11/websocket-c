@@ -18,7 +18,9 @@ static void print_byte_array(byte_array *buf) {
 
 #define LISTENER_URL "ws://127.0.0.1:3000/ws"
 
-static bool callback(struct ws_client_t *client, struct ws_message_t *msg) {
+static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void *context) {
+  (void)client;
+  (void)context;
   printf("response(type:%d):\n", msg->type);
   print_byte_array(&msg->body);
   return true;
@@ -36,7 +38,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   printf("listening for messages...\n");
-  ws_client_on_msg(&client, callback);
+  ws_client_on_msg(&client, callback, NULL);
   ws_client_free(&client);
   return 0;
 }

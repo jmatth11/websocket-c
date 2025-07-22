@@ -336,7 +336,7 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
   return true;
 }
 
-bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb, void *context) {
   bool running = true;
   bool close_sock = false;
   while (running) {
@@ -366,7 +366,7 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb) {
     case OPCODE_BIN:
       /* fall through */
     case OPCODE_TEXT: {
-      if (!cb(client, msg)) {
+      if (!cb(client, msg, context)) {
         running = false;
       }
       break;

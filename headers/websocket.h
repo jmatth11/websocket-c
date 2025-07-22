@@ -42,11 +42,13 @@ struct ws_client_t {
  *
  * @param[in] client The WebSocket client.
  * @param[in] msg The WebSocket message from the server.
+ * @param[in] context User supplied data.
  * @return True on success, false otherwise. False value also stops
  *  the internal listener loop.
  */
 typedef bool(on_message_callback)(struct ws_client_t *client,
-                                  struct ws_message_t *msg);
+                                  struct ws_message_t *msg,
+                                  void *context);
 
 /**
  * Initialize ws_client_t with all default values.
@@ -93,9 +95,10 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out)
  *
  * @param[in] client The WebSocket client.
  * @param[in] cb The callback function.
+ * @param[in] context The user supplied data.
  * @return True on successful exit, False otherwise.
  */
-bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb)
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb, void *context)
     __nonnull((1));
 
 /**

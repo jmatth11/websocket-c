@@ -66,7 +66,7 @@ Example of using the supplied `ws_client_on_msg` callback loop.
 
 #define LISTENER_URL "ws://127.0.0.1:3000/ws"
 
-static bool callback(struct ws_client_t *client, struct ws_message_t *msg) {
+static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void *context) {
   // handle the message
   return true;
 }
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   printf("listening for messages...\n");
-  ws_client_on_msg(&client, callback);
+  ws_client_on_msg(&client, callback, NULL);
   ws_client_free(&client);
   return 0;
 }
