@@ -4,6 +4,25 @@ Simple WebSocket library in C.
 
 Currently only implements the client side to talk to a server.
 
+## Dependencies
+
+Use the `./install_deps.sh` file to install the dependencies for the project.
+
+Required Deps:
+- [Zig](https://github.com/ziglang/zig) The Zig programming language.
+- [cstd](https://github.com/jmatth11/cstd) Common standard C functionality library.
+- [utf8-zig](https://github.com/jmatth11/utf8-zig) Small UTF8 helper library written in Zig.
+
+## Build
+
+Can build two ways:
+- Makefile (builds are put in `./bin`)
+    - `make` The default will build the main test executable.
+    - `make SHARED=1` Will build the shared library for websocket-c.
+- Zig (builds are put in `./zig-out/lib`)
+    - `zig build -Doptimize=ReleaseFast` Builds the shared library and wasm
+      library for websocket-c.
+
 ## Example
 
 ### Manual Loop
