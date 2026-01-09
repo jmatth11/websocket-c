@@ -41,7 +41,7 @@ fn createModule(
 
 pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
-    const use_ssl = b.option(bool, "use_ssl", "Use OpenSSL for WebSocket Secure support.") orelse .static;
+    const use_ssl = b.option(bool, "use_ssl", "Use OpenSSL for WebSocket Secure support.") orelse false;
     const webTarget = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     const webLib = b.addLibrary(.{
         .name = "webws",

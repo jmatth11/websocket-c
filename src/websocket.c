@@ -193,7 +193,7 @@ bool ws_client_from_str(const char *url, size_t len,
       client->use_tls = true;
       offset = ws_prefix_len;
 #else
-      fprintf(stderr, "Library was not built with SSL support.\nBuild with -DUSE_SSL=1.\n");
+      fprintf(stderr, "Library was not built with SSL support.\nBuild with \"make USE_SSL=1\" or \"zig build -Duse_ssl\".\n");
       return false;
 #endif
     } else {
@@ -248,8 +248,7 @@ bool ws_client_connect(struct ws_client_t *client) {
     fprintf(stderr, "WebSocket client's host was null.\n");
     return false;
   }
-  // TODO use getaddrinfo from <netdb.h> to get IP address from hostname
-  // getaddrinfo(<host>, <port>, <hints (i.e. IPv4 only or IPv4 and 6), <results>)
+  // TODO replace with new ws_connect function.
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
   client->__internal->addr.sin_family = AF_INET;
   client->__internal->addr.sin_port = htons(client->port);
