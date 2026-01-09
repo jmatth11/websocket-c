@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-Wall -std=c11
+CFLAGS=-Wall -Wextra -std=c11
 INCLUDES=-I. -I./deps/cstd/headers -I./deps/cstd/deps/utf8-zig/headers/
 LIBS=-L./deps/cstd/lib -L./deps/cstd/deps/utf8-zig/zig-out/lib/ -lcustom_std -lutf8-zig
 SOURCES=$(shell find . -name '*.c' -not -path './plugins/*' -not -path './deps/*' -not -path './libs/*' -not -path './tests/*')
@@ -7,7 +7,7 @@ TARGET=main
 DFLAGS=-DAPP_HASH=$(git log -n 1 --pretty=format:"%H")
 
 ifeq ($(DEBUG), 1)
-	CFLAGS += -DDEBUG=1 -ggdb
+	CFLAGS += -DDEBUG=1 -ggdb -fsanitize=undefined -fsanitize-trap=undefined
 endif
 ifeq ($(RELEASE), 1)
 	CFLAGS += -O2
