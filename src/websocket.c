@@ -2,8 +2,10 @@
 #include "headers/http.h"
 #include "headers/protocol.h"
 #include "headers/reader.h"
+#include "headers/net.h"
 #include "unicode_str.h"
 #include "magic.h"
+#include "string_ops.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -30,9 +32,8 @@
 static char *empty_path = "/";
 
 struct __ws_client_internal_t {
-  struct sockaddr_in addr;
   struct ws_reader_t *reader;
-  int socket;
+  struct net_info_t info;
 };
 
 #ifdef DEBUG
@@ -47,12 +48,8 @@ static inline void print_debug(struct ws_client_t *client) {
     fprintf(stderr, "host is null\n");
     return;
   }
-  int addr = 0;
-  if (client->__internal != NULL) {
-    addr = client->__internal->addr.sin_addr.s_addr;
-  }
-  printf("client->host: %s:%d%s - %d\nversion: %d\n", client->host,
-         client->port, path, addr, client->version);
+  printf("client->host: %s:%d%s\nversion: %d\n", client->host,
+         client->port, path, client->version);
 }
 
 #define debug_client(client) print_debug(client)
@@ -94,16 +91,9 @@ static bool set_handshake_headers(struct http_request_t *req,
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
-  // use NULL destination to get formatted string length
-  // returns inclusive length of string, we need to add 1 for malloc's exclusive
-  // length
-  size_t version_len = snprintf(NULL, 0, "%d", client->version) + 1;
-  // add extra 1 for null-terminator
-  char AUTO_C *version = malloc((sizeof(char) * version_len) + 1);
-  version_len = snprintf(version, version_len, "%d", client->version);
-  version[version_len] = '\0';
-  if (version_len == 0) {
-    fprintf(stderr, "failed to convert version to string.\n");
+  char AUTO_C *version = to_str(client->version);
+  if (version == NULL) {
+    fprintf(stderr, "failed to convert 'version' to a string.\n");
     return false;
   }
   if (!http_request_set_header(req, "Sec-WebSocket-Version", version)) {
@@ -248,48 +238,35 @@ bool ws_client_connect(struct ws_client_t *client) {
     fprintf(stderr, "WebSocket client's host was null.\n");
     return false;
   }
-  // TODO replace with new ws_connect function.
+  struct net_info_t result;
+  if (!ws_connect(client, &result)) {
+    fprintf(stderr, "WebSocket client could not connect.");
+    return false;
+  }
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
-  client->__internal->addr.sin_family = AF_INET;
-  client->__internal->addr.sin_port = htons(client->port);
+  client->__internal->info = result;
   client->__internal->reader = ws_reader_create();
-  if (inet_pton(AF_INET, client->host, &client->__internal->addr.sin_addr) !=
-      1) {
-    fprintf(stderr, "WebSocket Client host could not convert IP to addr.\n");
-    free(client->__internal);
-    return false;
-  }
-  debug_client(client);
-  int sock =
-      socket(client->__internal->addr.sin_family, SOCK_STREAM, IPPROTO_TCP);
-  if (connect(sock, (struct sockaddr *)&client->__internal->addr,
-              sizeof(client->__internal->addr)) != 0) {
-    fprintf(stderr, "WebSocket client failed to connect.\n");
-    free(client->__internal);
-    return false;
-  }
-  client->__internal->socket = sock;
   char AUTO_C *req = initial_handshake(client);
   if (req == NULL) {
     fprintf(stderr, "WebSocket client failed to create handshake.\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
 #ifdef DEBUG
   printf("sending req: \"%s\"\n", req);
 #endif
-  ssize_t n = send(sock, req, strlen(req), 0);
+  ssize_t n = send(client->__internal->info.socket, req, strlen(req), 0);
   if (n == -1) {
     fprintf(stderr, "message wasn't sent\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
   byte_array DEFER(byte_array_free) response;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -299,7 +276,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   struct http_response_t DEFER(http_response_free) resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -308,7 +285,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   resp_cstr[response.len] = '\0';
   if (!http_response_from_str(&resp, resp_cstr, response.len)) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -316,14 +293,14 @@ bool ws_client_connect(struct ws_client_t *client) {
   char *noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
     fprintf(stderr, "failed to get HTTP response header value.\n");
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
   if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
-    close(client->__internal->socket);
+    ws_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -446,6 +423,12 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_arr
 
 bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg) {
   return ws_client_write(client, msg->type, msg->body);
+}
+
+bool ws_client_set_net_info(struct ws_client_t *client, struct net_info_t *info) {
+  if (client->__internal == NULL) return false;
+  client->__internal->info = *info;
+  return true;
 }
 
 /**

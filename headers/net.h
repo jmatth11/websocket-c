@@ -17,7 +17,6 @@
 struct ws_client_t;
 
 struct net_info_t {
-  struct sockaddr_in addr;
   int socket;
 #ifdef WEBC_USE_SSL
   SSL *ssl;
@@ -29,7 +28,7 @@ bool ws_connect(struct ws_client_t *client, struct net_info_t *out) __nonnull((2
 bool ws_accept(struct ws_client_t *client);
 bool ws_read(struct ws_client_t *client);
 bool ws_write(struct ws_client_t *client);
-void ws_close(struct ws_client_t *client);
+void ws_close(struct net_info_t *info);
 void ws_deinit();
 
 #endif

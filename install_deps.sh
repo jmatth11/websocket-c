@@ -5,6 +5,6 @@ if [ ! -d ./deps/cstd ]; then
   cd deps/cstd
   ./install_deps.sh
   make
-  zig build
+  zig build -Doptimize=ReleaseSafe
   cd -
 fi

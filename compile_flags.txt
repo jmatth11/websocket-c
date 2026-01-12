@@ -6,5 +6,7 @@
 -lcustom_std
 -lutf8-zig
 -Wall
--std=c11
+-std=gnu11
 -lm
+
+-DWEBC_USE_SSL=1
