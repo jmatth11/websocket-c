@@ -22,6 +22,33 @@
 #include <openssl/types.h>
 
 static SSL_CTX *ctx = NULL;
+/**
+ * Init
+ */
+bool ws_init(const char * restrict cert, const char * restrict path) {
+  if (ctx == NULL) {
+    SSL_library_init();
+    ctx = SSL_CTX_new(TLS_client_method());
+    if (cert != NULL) {
+      if (!SSL_CTX_load_verify_locations(ctx, cert, path)) {
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(ctx);
+        ctx = NULL;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+/**
+ * Deinit
+ */
+void ws_deinit() {
+  if (ctx != NULL) {
+    SSL_CTX_free(ctx);
+    ctx = NULL;
+  }
+}
 #endif
 
 /**
@@ -40,19 +67,6 @@ struct net_result_t gen_net_result() {
       .error_triggered = false,
       .ctx = NULL,
   };
-}
-
-/**
- * Init
- */
-bool ws_init() {
-#ifdef WEBC_USE_SSL
-  if (ctx == NULL) {
-    SSL_library_init();
-    ctx = SSL_CTX_new(TLS_client_method());
-  }
-#endif
-  return true;
 }
 
 /**
@@ -142,6 +156,7 @@ bool ws_connect(struct ws_client_t *client, struct net_info_t *out) {
 
 /**
  * Accept
+ * TODO finish implementation.
  */
 bool ws_accept(struct ws_client_t *client, struct net_info_t *info) { return true; }
 
@@ -219,14 +234,3 @@ void ws_close(struct net_info_t *info) {
   close(info->socket);
 }
 
-/**
- * Deinit
- */
-void ws_deinit() {
-#ifdef WEBC_USE_SSL
-  if (ctx != NULL) {
-    SSL_CTX_free(ctx);
-    ctx = NULL;
-  }
-#endif
-}
