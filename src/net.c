@@ -8,7 +8,12 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
+
+#ifndef BUFSIZ
+  #define BUFSIZ 4096
+#endif
 
 #ifdef WEBC_USE_SSL
 #include <openssl/err.h>
@@ -19,11 +24,17 @@
 static SSL_CTX *ctx = NULL;
 #endif
 
+/**
+ * Structure to track result for function cleanup.
+ */
 struct net_result_t {
   bool error_triggered;
   void *ctx;
 };
 
+/**
+ * Generate default net result.
+ */
 struct net_result_t gen_net_result() {
   return (struct net_result_t){
       .error_triggered = false,
@@ -31,6 +42,9 @@ struct net_result_t gen_net_result() {
   };
 }
 
+/**
+ * Init
+ */
 bool ws_init() {
 #ifdef WEBC_USE_SSL
   if (ctx == NULL) {
@@ -41,6 +55,9 @@ bool ws_init() {
   return true;
 }
 
+/**
+ * cleanup function for connect
+ */
 static void ws_connect_cleanup(struct net_result_t *result) {
   if (!result->error_triggered) {
     return;
@@ -59,7 +76,13 @@ static void ws_connect_cleanup(struct net_result_t *result) {
   }
 }
 
+/**
+ * Connect
+ */
 bool ws_connect(struct ws_client_t *client, struct net_info_t *out) {
+  if (client == NULL) {
+    return false;
+  }
   DEFER(ws_connect_cleanup) struct net_result_t context = gen_net_result();
   struct net_info_t result = {0};
   result.socket = -1;
@@ -117,15 +140,73 @@ bool ws_connect(struct ws_client_t *client, struct net_info_t *out) {
   return true;
 }
 
-bool ws_accept(struct ws_client_t *client) { return true; }
-bool ws_read(struct ws_client_t *client) {
-  // TODO implement
-  return true;
+/**
+ * Accept
+ */
+bool ws_accept(struct ws_client_t *client, struct net_info_t *info) { return true; }
+
+ssize_t ws_peek(struct ws_client_t *client, struct net_info_t *info, void *buf, size_t buf_len) {
+  if (client == NULL || info == NULL || buf == NULL) {
+    return false;
+  }
+#ifdef WEBC_USE_SSL
+  if (client->use_tls) {
+    const ssize_t n = SSL_peek(info->ssl, buf, buf_len);
+    if (n < 0) {
+      ERR_print_errors_fp(stderr);
+    }
+    return n;
+  }
+#endif
+  const ssize_t n = recv(info->socket, buf, buf_len, MSG_PEEK);
+  if (n < 0) {
+    fprintf(stderr, "WebSocket recv failed.\n");
+  }
+  return n;
 }
-bool ws_write(struct ws_client_t *client) {
-  // TODO implement
-  return true;
+
+ssize_t ws_read(struct ws_client_t *client, struct net_info_t *info, void *buf, size_t buf_len) {
+  if (client == NULL || info == NULL || buf == NULL) {
+    return false;
+  }
+#ifdef WEBC_USE_SSL
+  if (client->use_tls) {
+    const ssize_t n = SSL_read(info->ssl, buf, buf_len);
+    if (n < 0) {
+      ERR_print_errors_fp(stderr);
+    }
+    return n;
+  }
+#endif
+  return recv(info->socket, buf, buf_len, 0);
 }
+
+/**
+ * Write
+ */
+ssize_t ws_write(struct ws_client_t *client, struct net_info_t *info, const void *buf, size_t buf_len) {
+  if (client == NULL || info == NULL || buf == NULL) {
+    return false;
+  }
+#ifdef WEBC_USE_SSL
+  if (client->use_tls) {
+    const ssize_t n = SSL_write(info->ssl, buf, buf_len);
+    if (n < 0) {
+      ERR_print_errors_fp(stderr);
+    }
+    return n;
+  }
+#endif
+  const ssize_t n = send(info->socket, buf, buf_len, 0);
+  if (n < 0) {
+    fprintf(stderr, "WebSocket client send failure.\n");
+  }
+  return n;
+}
+
+/**
+ * Close
+ */
 void ws_close(struct net_info_t *info) {
   if (info == NULL) return;
 #ifdef WEBC_USE_SSL
@@ -137,9 +218,15 @@ void ws_close(struct net_info_t *info) {
 #endif
   close(info->socket);
 }
+
+/**
+ * Deinit
+ */
 void ws_deinit() {
+#ifdef WEBC_USE_SSL
   if (ctx != NULL) {
     SSL_CTX_free(ctx);
     ctx = NULL;
   }
+#endif
 }
