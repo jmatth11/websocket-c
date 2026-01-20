@@ -105,8 +105,10 @@ bool net_connect(const char *restrict host, const char *restrict port,
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
-  if (!getaddrinfo(host, port, &hints, &res)) {
-    fprintf(stderr, "failed to get address info.\n");
+  const int err = getaddrinfo(host, port, &hints, &res);
+  if (err != 0) {
+    fprintf(stderr, "failed to get address info - host:\"%s\", port:\"%s\".\n", host, port);
+    fprintf(stderr, "errno: %s\n", strerror(err));
     return false;
   }
   int sock = -1;
