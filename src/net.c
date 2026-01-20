@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <openssl/evp.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -24,10 +25,16 @@ static SSL_CTX *ctx = NULL;
 /**
  * Init
  */
-bool net_init(const char *restrict cert, const char *restrict path) {
+bool net_init_client(const char *restrict cert, const char *restrict path) {
   if (ctx == NULL) {
     SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
     ctx = SSL_CTX_new(TLS_client_method());
+    if (ctx == NULL) {
+      ERR_print_errors_fp(stderr);
+      return false;
+    }
     if (cert != NULL) {
       if (!SSL_CTX_load_verify_locations(ctx, cert, path)) {
         ERR_print_errors_fp(stderr);
@@ -35,10 +42,46 @@ bool net_init(const char *restrict cert, const char *restrict path) {
         ctx = NULL;
         return false;
       }
+      SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+      SSL_CTX_set_verify_depth(ctx, 4);
+      SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     }
   }
   return true;
 }
+
+bool net_init_server(const char *restrict key, const char *restrict cert) {
+  if (ctx == NULL) {
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+    ctx = SSL_CTX_new(TLS_client_method());
+    if (ctx == NULL) {
+      ERR_print_errors_fp(stderr);
+      return false;
+    }
+    if (key != NULL && cert != NULL) {
+      if (SSL_CTX_use_certificate_file(ctx, cert, SSL_FILETYPE_PEM) <= 0) {
+          ERR_print_errors_fp(stderr);
+          SSL_CTX_free(ctx);
+          return false;
+      }
+      if (SSL_CTX_use_PrivateKey_file(ctx, key, SSL_FILETYPE_PEM) <= 0) {
+          ERR_print_errors_fp(stderr);
+          SSL_CTX_free(ctx);
+          return false;
+      }
+      if (!SSL_CTX_check_private_key(ctx)) {
+          fprintf(stderr, "Private key does not match the certificate public key\n");
+          SSL_CTX_free(ctx);
+          return false;
+      }
+      SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+    }
+  }
+  return true;
+}
+
 /**
  * Deinit
  */
@@ -46,6 +89,7 @@ void net_deinit() {
   if (ctx != NULL) {
     SSL_CTX_free(ctx);
     ctx = NULL;
+    EVP_cleanup();
   }
 }
 #endif

@@ -5,7 +5,8 @@
  * Wrapper functionality for network communication.
  * This will handle regular and OpenSSL operations.
  *
- * If using OpenSSL net_init/net_deinit must be used appropriately.
+ * If using OpenSSL net_init_[client|server]/net_deinit must be used appropriately.
+ * Only one can be initialized, either client or server.
  */
 
 #include "defs.h"
@@ -27,14 +28,26 @@ struct net_info_t {
 #ifdef WEBC_USE_SSL
 
 /**
- * Initialize SSL library functionality.
+ * Initialize SSL library functionality for client.
  * Provide optional cert/path for trusted verification.
+ * Cannot use if net_init_server has already been used.
  *
  * @param cert The cert file name.
  * @param path The path to the cert file. Can be NULL if relative.
  * @return True on success, false otherwise.
  */
-bool net_init(const char *restrict cert, const char *restrict path);
+bool net_init_client(const char *restrict cert, const char *restrict path);
+
+/**
+ * Initialize SSL library functionality for server.
+ * Provide server certificates.
+ * Cannot use if net_init_client has already been used.
+ *
+ * @param key The private key file name.
+ * @param cert The cert file name.
+ * @return True on success, false otherwise.
+ */
+bool net_init_server(const char *restrict key, const char *restrict cert);
 
 /**
  * Deinitalize the SSL library functionality.
@@ -42,6 +55,7 @@ bool net_init(const char *restrict cert, const char *restrict path);
 void net_deinit();
 
 #endif
+
 
 /**
  * Connect to a TCP socket and populate the given connection info in the
@@ -55,6 +69,7 @@ void net_deinit();
 bool net_connect(const char *restrict host, const char *restrict port,
                  struct net_info_t *out) __nonnull((3));
 
+// TODO need to implement create_listener socket to go along with accept
 /**
  * Accept an incoming connection.
  */
