@@ -7,6 +7,9 @@
 
 #include <stdbool.h>
 
+// forward declare
+struct net_info_t;
+
 /**
  * WebSocket Reader structure.
  */
@@ -43,7 +46,7 @@ struct ws_reader_t* ws_reader_create();
  * @param[in] socket The socket to listen on.
  * @return True on success, false otherwise.
  */
-bool ws_reader_handle(struct ws_reader_t *reader, int socket) __nonnull((1));
+bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) __nonnull((1));
 
 /**
  * Get the next generated message from the WebSocket reader.

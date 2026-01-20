@@ -9,6 +9,7 @@ fn createModule(
     const files: []const []const u8 = &.{
         "src/websocket.c",
         "src/http.c",
+        "src/net.c",
         "src/reader.c",
         "src/protocol.c",
     };
@@ -17,7 +18,7 @@ fn createModule(
         "-Wall",
         "-Wextra",
         "-O2",
-        "-std=c11",
+        "-std=gnu11",
         ssl_flag,
     };
     const module = b.addModule("ws", .{
@@ -25,7 +26,9 @@ fn createModule(
         .target = target,
         .optimize = optimize,
     });
-    module.linkSystemLibrary("libssl", .{ .needed = use_ssl });
+    if (use_ssl) {
+        module.linkSystemLibrary("libssl", .{ .needed = use_ssl });
+    }
     module.addCSourceFiles(.{
         .language = .c,
         .files = files,

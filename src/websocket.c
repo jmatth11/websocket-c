@@ -57,6 +57,10 @@ static inline void print_debug(struct ws_client_t *client) {
 #define debug_client(client)
 #endif
 
+static bool ws_check_internals(struct ws_client_t *client) {
+  return client->__internal != NULL && client->__internal->reader != NULL;
+}
+
 /**
  * Recieve data from the WebSocket Client and store the results in the out
  * parameter. This operation blocks. The caller is responsible for freeing the
@@ -69,7 +73,7 @@ static inline void print_debug(struct ws_client_t *client) {
 static bool ws_client_recv(struct ws_client_t *client, byte_array *out);
 
 static bool ws_client_write_blob(struct ws_client_t *client, byte_array *msg) {
-  ssize_t n = send(client->__internal->info.socket, msg->byte_data, msg->len, 0);
+  ssize_t n = net_write(&client->__internal->info, msg->byte_data, msg->len);
   if (n == -1) {
     fprintf(stderr, "WebSocket client send failure.\n");
     return false;
@@ -239,7 +243,9 @@ bool ws_client_connect(struct ws_client_t *client) {
     return false;
   }
   struct net_info_t result;
-  if (!ws_connect(client, &result)) {
+  memset(&result, 0, sizeof(result));
+  char AUTO_C *port_str = to_str(client->port);
+  if (!net_connect(client->host, port_str, &result)) {
     fprintf(stderr, "WebSocket client could not connect.");
     return false;
   }
@@ -249,24 +255,24 @@ bool ws_client_connect(struct ws_client_t *client) {
   char AUTO_C *req = initial_handshake(client);
   if (req == NULL) {
     fprintf(stderr, "WebSocket client failed to create handshake.\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
 #ifdef DEBUG
   printf("sending req: \"%s\"\n", req);
 #endif
-  ssize_t n = send(client->__internal->info.socket, req, strlen(req), 0);
+  ssize_t n = net_write(&client->__internal->info, req, strlen(req));
   if (n == -1) {
     fprintf(stderr, "message wasn't sent\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
   byte_array DEFER(byte_array_free) response;
   if (!ws_client_recv(client, &response)) {
     fprintf(stderr, "WebSocket client failed to connect.\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -276,7 +282,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   struct http_response_t DEFER(http_response_free) resp;
   if (!http_response_init(&resp)) {
     fprintf(stderr, "failed to initialize HTTP response structure.\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -285,7 +291,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   resp_cstr[response.len] = '\0';
   if (!http_response_from_str(&resp, resp_cstr, response.len)) {
     fprintf(stderr, "failed to parse HTTP response message.\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -293,14 +299,14 @@ bool ws_client_connect(struct ws_client_t *client) {
   char *noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
     fprintf(stderr, "failed to get HTTP response header value.\n");
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
   if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
@@ -317,8 +323,11 @@ bool ws_client_connect(struct ws_client_t *client) {
  */
 bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
   // TODO rework to ensure we've read the entire http message
+  if (!ws_check_internals(client)) {
+    return false;
+  }
   uint8_t buffer[BUFSIZ] = {0};
-  const ssize_t n = recv(client->__internal->info.socket, buffer, BUFSIZ, 0);
+  const ssize_t n = net_read(&client->__internal->info, buffer, BUFSIZ);
   if (n == -1) {
     fprintf(stderr, "WebSocket client recieve failure.\n");
     return false;
@@ -333,7 +342,7 @@ bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
 
 bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
   if (!ws_reader_handle(client->__internal->reader,
-                        client->__internal->info.socket)) {
+                        &client->__internal->info)) {
     return false;
   }
   *out = ws_reader_next_msg(client->__internal->reader);
@@ -450,7 +459,7 @@ void ws_client_free(struct ws_client_t *client) {
     client->path = NULL;
   }
   if (client->__internal != NULL) {
-    ws_close(&client->__internal->info);
+    net_close(&client->__internal->info);
     if (client->__internal->reader != NULL) {
       ws_reader_destroy(&client->__internal->reader);
     }

@@ -1,4 +1,5 @@
 #include "headers/reader.h"
+#include "headers/net.h"
 #include "headers/protocol.h"
 #include "queue.h"
 #include <stdio.h>
@@ -54,13 +55,17 @@ struct ws_reader_t* ws_reader_create() {
   result->msg_queue = simple_queue_create();
   return result;
 }
-bool ws_reader_handle(struct ws_reader_t *reader, int socket) {
+
+bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
+  if (info == NULL) {
+    return false;
+  }
   // 10 for possible 8 byte payload value
   uint8_t header[10] = {0};
 #ifdef DEBUG
   printf("peeking from socket\n");
 #endif
-  ssize_t n = recv(socket, header, 10, MSG_PEEK);
+  ssize_t n = net_peek(info, header, 10);
   if (n == -1) {
     return false;
   } else if (n == 0) {
@@ -91,7 +96,7 @@ bool ws_reader_handle(struct ws_reader_t *reader, int socket) {
 #ifdef DEBUG
   printf("reading from socket\n");
 #endif
-  n = recv(socket, buffer, msg_len, 0);
+  n = net_read(info, buffer, msg_len);
   if (n == -1 && frame->codes.flags.opcode == OPCODE_CLOSE) {
     frame->payload.byte_data = NULL;
     frame->payload.len = 0;
@@ -107,7 +112,7 @@ bool ws_reader_handle(struct ws_reader_t *reader, int socket) {
     }
     return true;
   }
-  if (n != msg_len) {
+  if (((size_t)n) != msg_len) {
     fprintf(stderr, "socket read did not match message length: n=%ld; msg_len:%zu\n", n, msg_len);
     ws_frame_free(frame);
     free(frame);

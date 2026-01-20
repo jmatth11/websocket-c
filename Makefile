@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-Wall -Wextra -std=c11
+CFLAGS=-Wall -Wextra -std=gnu11
 INCLUDES=-I. -I./deps/cstd/headers -I./deps/cstd/deps/utf8-zig/headers/
 LIBS=-L./deps/cstd/lib -L./deps/cstd/deps/utf8-zig/zig-out/lib/ -lcustom_std -lutf8-zig
 SOURCES=$(shell find . -name '*.c' -not -path './plugins/*' -not -path './deps/*' -not -path './libs/*' -not -path './tests/*')
@@ -7,10 +7,13 @@ TARGET=main
 DFLAGS=-DAPP_HASH=$(shell git log -n 1 --pretty=format:"%H")
 
 ifeq ($(DEBUG), 1)
-	CFLAGS += -DDEBUG=1 -ggdb -fsanitize=undefined -fsanitize-trap=undefined
+	CFLAGS += -DDEBUG=1 -ggdb
 endif
 ifeq ($(RELEASE), 1)
 	CFLAGS += -O2
+else
+	CFLAGS += -fsanitize=undefined -fsanitize-trap=undefined
+	LIBS += -lubsan
 endif
 ifeq ($(SHARED), 1)
 	SOURCES=$(shell find ./src -name '*.c')
@@ -34,7 +37,7 @@ ifeq ($(SHARED), 1)
 	$(CC) -shared -fPIC -o $(BIN)/$(TARGET).so $^ $(LIBS)
 	ar -rcs $(BIN)/$(TARGET).a $^
 else
-	$(CC) $(CFLAGS) $(LIBS) $^ -o $(BIN)/$(TARGET)
+	$(CC) $^ -o $(BIN)/$(TARGET) $(CFLAGS) $(LIBS)
 endif
 
 $(OBJ)/%.o: %.c

@@ -10,7 +10,7 @@
 static void print_byte_array(byte_array *buf) {
   const size_t len = buf->len;
   printf("msg: ");
-  for (int i = 0; i < len; ++i) {
+  for (size_t i = 0; i < len; ++i) {
     printf("%c", buf->byte_data[i]);
   }
   printf("\n");
@@ -26,7 +26,7 @@ static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void 
   return true;
 }
 
-int main(int argc, char **argv) {
+int main(void) {
   struct ws_client_t client;
   ws_client_init(&client);
   if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
