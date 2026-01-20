@@ -21,7 +21,7 @@ ifeq ($(SHARED), 1)
 endif
 
 ifeq ($(USE_SSL), 1)
-	LIBS += $(shell pkg-config --libs libssl)
+	LIBS += $(shell pkg-config --libs openssl)
 	DFLAGS += -DWEBC_USE_SSL=1
 endif
 

@@ -6,6 +6,7 @@ fn createModule(
     target: std.Build.ResolvedTarget,
     use_ssl: bool,
 ) *std.Build.Module {
+    const ssl_compatible = (target.result.cpu.arch != .wasm32 and target.result.cpu.arch != .wasm64);
     const files: []const []const u8 = &.{
         "src/websocket.c",
         "src/http.c",
@@ -13,7 +14,7 @@ fn createModule(
         "src/reader.c",
         "src/protocol.c",
     };
-    const ssl_flag: []const u8 = if (use_ssl) "-DWEBC_USE_SSL=1" else "";
+    const ssl_flag: []const u8 = if (use_ssl and ssl_compatible) "-DWEBC_USE_SSL=1" else "";
     const flags: []const []const u8 = &.{
         "-Wall",
         "-Wextra",
@@ -26,8 +27,9 @@ fn createModule(
         .target = target,
         .optimize = optimize,
     });
-    if (use_ssl) {
-        module.linkSystemLibrary("libssl", .{ .needed = use_ssl });
+    if (use_ssl and ssl_compatible) {
+        module.addLibraryPath(.{.cwd_relative = "/usr/lib/x86_64-linux-gnu"});
+        module.linkSystemLibrary("openssl", .{ .needed = use_ssl });
     }
     module.addCSourceFiles(.{
         .language = .c,
