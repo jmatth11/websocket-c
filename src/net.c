@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <openssl/evp.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -20,6 +19,7 @@
 #include <openssl/ssl.h>
 #include <openssl/tls1.h>
 #include <openssl/types.h>
+#include <openssl/evp.h>
 
 static SSL_CTX *ctx = NULL;
 /**
