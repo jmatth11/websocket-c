@@ -13,12 +13,8 @@ Table of Contents:
     - [OpenSSL Example](#openssl-example)
 - [Demo](#demo)
 
-
-Simple WebSocket library in C.
-
-Currently only implements the client side to talk to a server.
-
-Supports both `ws`/`wss` with optional OpenSSL support.
+A small Client-Side WebSocket library implemented in C.
+Supports both `ws` and `wss` (if built with OpenSSL. see [build options](#build-options))
 
 ## Dependencies
 
@@ -68,33 +64,28 @@ To run the test application there is a Go application provided to run against.
 
 ### Non-Secure
 
-Build the test application with `make` to test non-secure functionality.
-
-Inside the `test/server` directory you can build the Go application with `go
-build`.
-Then run the application from that directory with `./test`
-
-Then from the root directory of the project run the test application with
-`./run.sh`.
+1. Build the test application with `make` to test non-secure functionality.
+2. Inside the `test/server` directory you can build the Go application with `go
+   build`.
+3. Then run the application from that directory with `./test`.
+4. Then from the root directory of the project run the test application with
+   `./run.sh`.
 
 You will be presented with a prompt in the terminal whatever you type (up-to
 100 characters) will be sent to the server and echoed back to you.
 
 ### Secure
 
-Build the test application with `make USE_SSL=1` to test secure functionality.
-
-Inside the `test/` directory run the `./ssl_gen.sh` script from that directory
-to generate a `server.crt` certificate and `server.key` private key to use with
-the server and client.
-
-Inside the `test/server` directory you can build the Go application with `go
-build`.
-Then run the application from that directory with `sudo ./test tls`. The `tls`
-argument will start a TLS server.
-
-Then from the root directory of the project run the test application with
-`./run.sh`.
+1. Build the test application with `make USE_SSL=1` to test secure functionality.
+2. Inside the `test/` directory run the `./ssl_gen.sh` script from that
+   directory to generate a `server.crt` certificate and `server.key` private
+   key to use with the server and client.
+3. Inside the `test/server` directory you can build the Go application with `go
+   build`.
+4. Then run the application from that directory with `sudo ./test tls`. The
+   `tls` argument will start a TLS server.
+5. Then from the root directory of the project run the test application with
+   `./run.sh`.
 
 You will be presented with a prompt in the terminal whatever you type (up-to
 100 characters) will be sent to the server and echoed back to you.
