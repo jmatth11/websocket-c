@@ -47,9 +47,8 @@ enum http_method_t http_method_get_enum(const char *method) {
 }
 
 static char * normalized_cstr(const char *str, size_t len) {
-  size_t str_len = strlen(str);
   struct unicode_str_t DEFER(unicode_str_destroy) *uni_str = unicode_str_create();
-  if (unicode_str_set_char(uni_str, str, str_len) < str_len) {
+  if (unicode_str_set_char(uni_str, str, len) < len) {
     fprintf(stderr, "failed to set header during unicode conversion.\n");
     return false;
   }
@@ -208,12 +207,24 @@ bool http_response_init(struct http_response_t *r) {
 
 static size_t parse_response_start_line(struct http_response_t *r,
                                         const char *str, size_t len) {
+  if (len == 0) {
+    return 0;
+  }
   size_t index = 0;
   size_t word_len = strcspn(str, " ");
+  if (word_len > len) {
+    return 0;
+  }
   r->message.protocol = str_dup(str, word_len);
   // plus 1 to skip empty string.
   index += word_len + 1;
+  if (index > len) {
+    return 0;
+  }
   word_len = strcspn(&str[index], " ");
+  if ((index + word_len) > len) {
+    return 0;
+  }
   char status_code[4] = {0};
   if (strncpy(status_code, &str[index], 3) == NULL) {
     fprintf(stderr, "failed to copy status code.\n");
@@ -222,7 +233,13 @@ static size_t parse_response_start_line(struct http_response_t *r,
   }
   r->message.status_code = atoi(status_code);
   index += word_len + 1;
+  if (index > len) {
+    return 0;
+  }
   word_len = strcspn(&str[index], "\r");
+  if ((index + word_len) > len) {
+    return 0;
+  }
   r->message.status_text = str_dup(&str[index], word_len);
   index += word_len;
   return index;
@@ -295,15 +312,24 @@ static size_t parse_request_start_line(struct http_request_t *r,
                                        const char *str, size_t len) {
   size_t index = 0;
   size_t word_len = strcspn(str, " ");
+  if ((index + word_len) > len) {
+    return 0;
+  }
   char *method = str_dup(str, word_len);
   r->message.method = http_method_get_enum(method);
   free(method);
   // plus 1 to skip empty string.
   index += word_len + 1;
   word_len = strcspn(&str[index], " ");
+  if ((index + word_len) > len) {
+    return 0;
+  }
   r->message.path = str_dup(&str[index], word_len);
   index += word_len + 1;
   word_len = strcspn(&str[index], "\r");
+  if ((index + word_len) > len) {
+    return 0;
+  }
   r->message.protocol = str_dup(&str[index], word_len);
   index += word_len + 2;
   return index;

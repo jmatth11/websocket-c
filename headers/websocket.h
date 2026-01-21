@@ -8,6 +8,9 @@
 #include "reader.h"
 #include "unicode_str.h"
 
+// forward ref
+struct net_info_t;
+
 /**
  * Internal WebSocket client data.
  */
@@ -35,6 +38,12 @@ struct ws_client_t {
    * Default is 13.
    */
   unsigned short version;
+#ifdef WEBC_USE_SSL
+  /**
+   * Flag to use TLS connection.
+   */
+  bool use_tls;
+#endif
 };
 
 /**
@@ -122,6 +131,16 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type,
  */
 bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg)
     __nonnull((1, 2));
+
+/**
+ * Set the net info data for the websocket client.
+ *
+ * @param[in] client The WebSocket client.
+ * @param[in] info The net info structure.
+ * @return True on success, false otherwise.
+ */
+bool ws_client_set_net_info(struct ws_client_t *client, struct net_info_t *info)
+  __nonnull((1, 2));
 
 /**
  * Free the internal WebSocket client data.
