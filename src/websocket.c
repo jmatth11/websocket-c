@@ -185,7 +185,7 @@ bool ws_client_from_str(const char *url, size_t len,
     if (strncmp(WSS_PREFIX, url, wss_prefix_len) == 0) {
 #ifdef WEBC_USE_SSL
       client->use_tls = true;
-      offset = ws_prefix_len;
+      offset = wss_prefix_len;
 #else
       fprintf(stderr, "Library was not built with SSL support.\nBuild with \"make USE_SSL=1\" or \"zig build -Duse_ssl\".\n");
       return false;

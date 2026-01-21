@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "headers/net.h"
 #include "headers/protocol.h"
 #include "headers/reader.h"
 #include "headers/websocket.h"
@@ -12,7 +13,19 @@
 
 // defined constants
 #define STDIN_BUF 100
+#ifdef WEBC_USE_SSL
+#define LISTENER_URL "wss://localhost:443/ws"
+
+// SSL init/deinit
+static void init() { net_init_client("./test/server.crt", NULL); }
+static void deinit() { net_deinit(); }
+
+#else
 #define LISTENER_URL "ws://localhost:80/ws"
+// empty since we aren't using ssl
+static void init() {}
+static void deinit() {}
+#endif
 
 // print the byte array
 static void print_byte_array(byte_array *buf) {
@@ -47,17 +60,21 @@ void *client_msg(void *ctx) {
 }
 
 int main(void) {
+  init();
   // create websocket client.
   struct ws_client_t client;
   ws_client_init(&client);
   // create from URL
+  printf("connecting to %s\n", LISTENER_URL);
   if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
     fprintf(stderr, "client from string URL failed.\n");
+    deinit();
     return 1;
   }
   // connect
   if (!ws_client_connect(&client)) {
     fprintf(stderr, "client failed to connect.\n");
+    deinit();
     return 1;
   }
   // setup background thread for listener
@@ -65,16 +82,18 @@ int main(void) {
   const int ret_code = pthread_create(&thread, NULL, client_msg, &client);
   if (ret_code != 0) {
     fprintf(stderr, "pthread failed: %s\n", strerror(ret_code));
+    deinit();
     return -1;
   }
 
   // setup stdin buffer to send messages on the client
   char stdin_buf[STDIN_BUF];
-  memset(stdin_buf, 0, sizeof(char)*STDIN_BUF);
+  memset(stdin_buf, 0, sizeof(char) * STDIN_BUF);
   byte_array send_buffer;
   if (!byte_array_init(&send_buffer, STDIN_BUF)) {
     fprintf(stderr, "failed to initialize buffer.\n");
     ws_client_free(&client);
+    deinit();
     return -1;
   }
   do {
@@ -84,7 +103,7 @@ int main(void) {
     size_t index = 0;
     send_buffer.len = 0;
     // populate send buffer
-    while(true) {
+    while (true) {
       send_buffer.byte_data[index] = (uint8_t)stdin_buf[index];
       send_buffer.len += 1;
       if (send_buffer.byte_data[index] == '\n') {
@@ -106,5 +125,6 @@ int main(void) {
   // cleanup
   byte_array_free(&send_buffer);
   ws_client_free(&client);
+  deinit();
   return 0;
 }

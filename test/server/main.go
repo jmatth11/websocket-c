@@ -62,7 +62,7 @@ func main() {
 	// You need valid certificate and key files
 	var err error
 	if use_tls {
-		err = http.ListenAndServeTLS(":443", "server.crt", "server.key", nil)
+		err = http.ListenAndServeTLS(":443", "../server.crt", "../server.key", nil)
 	} else {
 		err = http.ListenAndServe(":80", nil)
 	}

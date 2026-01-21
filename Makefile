@@ -40,7 +40,7 @@ ifeq ($(SHARED), 1)
 	$(CC) -shared -fPIC -o $(BIN)/$(TARGET).so $^ $(LIBS)
 	ar -rcs $(BIN)/$(TARGET).a $^
 else
-	$(CC) $^ -o $(BIN)/$(TARGET) $(CFLAGS) $(LIBS)
+	$(CC) $^ -o $(BIN)/$(TARGET) $(CFLAGS) $(DFLAGS) $(LIBS)
 endif
 
 $(OBJ)/%.o: %.c
