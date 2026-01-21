@@ -64,7 +64,7 @@ func main() {
 	if use_tls {
 		err = http.ListenAndServeTLS(":443", "../server.crt", "../server.key", nil)
 	} else {
-		err = http.ListenAndServe(":80", nil)
+		err = http.ListenAndServe(":3000", nil)
 	}
 	if err != nil {
 		log.Fatal("ListenAndServe error: ", err)

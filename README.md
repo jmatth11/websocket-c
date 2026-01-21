@@ -1,8 +1,23 @@
 # WebSocket-C
 
+Table of Contents:
+- [Dependencies](#dependencies)
+- [Build](#build)
+    - [Build Options](#build-options)
+- [Testing](#testing)
+    - [Non-Secure](#non-secure)
+    - [Secure](#secure)
+- [Examples](#examples)
+    - [Manual Loop](#manual-loop)
+    - [Callback Loop](#callback-loop)
+    - [OpenSSL Example](#openssl-example)
+
+
 Simple WebSocket library in C.
 
 Currently only implements the client side to talk to a server.
+
+Supports both `ws`/`wss` with optional OpenSSL support.
 
 ## Dependencies
 
@@ -15,15 +30,75 @@ Required Deps:
 
 ## Build
 
-Can build two ways:
+Quickstart:
+
+Both methods are basically the same except:
+- Zig build option will build a wasm target library as well.
+- Makefile will build the test application.
+
+Makefile
+```bash
+make RELEASE=1 USE_SSL=1 SHARED=1
+```
+
+Zig build:
+```bash
+zig build -Doptimize=ReleaseFast -Duse_ssl
+```
+
+### Build Options
 - Makefile (builds are put in `./bin`)
-    - `make` The default will build the main test executable.
-    - `make SHARED=1` Will build the shared library for websocket-c.
+    - `make` The default will build the main test executable. The test
+      executable uses normal connection by default.
+    - `SHARED=1` Will build the shared library for websocket-c.
+    - `RELEASE=1` Builds with optimizations turned on.
+    - `USE_SSL=1` Build with OpenSSL support. For the test executable it builds
+      to use `wss`.
+    - `DISABLE_SIMD` Force disable SIMD functionality.
 - Zig (builds are put in `./zig-out/lib`)
     - `zig build -Doptimize=ReleaseFast` Builds the shared library and wasm
       library for websocket-c.
+    - `-Duse_ssl` Builds with OpenSSL support.
+    - `-Ddisable_simd` Force disable SIMD functionality.
 
-## Example
+## Testing
+
+To run the test application there is a Go application provided to run against.
+
+### Non-Secure
+
+Build the test application with `make` to test non-secure functionality.
+
+Inside the `test/server` directory you can build the Go application with `go
+build`.
+Then run the application from that directory with `./test`
+
+Then from the root directory of the project run the test application with
+`./run.sh`.
+
+You will be presented with a prompt in the terminal whatever you type (up-to
+100 characters) will be sent to the server and echoed back to you.
+
+### Secure
+
+Build the test application with `make USE_SSL=1` to test secure functionality.
+
+Inside the `test/` directory run the `./ssl_gen.sh` script from that directory
+to generate a `server.crt` certificate and `server.key` private key to use with
+the server and client.
+
+Inside the `test/server` directory you can build the Go application with `go
+build`.
+Then run the application from that directory with `sudo ./test tls`. The `tls`
+argument will start a TLS server.
+
+Then from the root directory of the project run the test application with
+`./run.sh`.
+
+You will be presented with a prompt in the terminal whatever you type (up-to
+100 characters) will be sent to the server and echoed back to you.
+
+## Examples
 
 ### Manual Loop
 
@@ -36,14 +111,17 @@ Example of using your own listener loop.
 
 #include "websocket.h"
 
+// URL
 #define LISTENER_URL "ws://127.0.0.1:3000/ws"
 
 int main(int argc, char **argv) {
+  // construct our client from the URL string.
   struct ws_client_t client;
   if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
     fprintf(stderr, "client from string URL failed.\n");
     return 1;
   }
+  // connect the client to the server.
   if (!ws_client_connect(&client)) {
     fprintf(stderr, "client failed to connect.\n");
     return 1;
@@ -51,6 +129,7 @@ int main(int argc, char **argv) {
   while (1) {
     printf("waiting for messages...\n");
     struct ws_message_t *msg = NULL;
+    // waiting for the next message to be received.
     if (!ws_client_next_msg(&client, &msg)) {
       fprintf(stderr, "client failed to recv.\n");
       break;
@@ -62,9 +141,11 @@ int main(int argc, char **argv) {
 
     // handle message here
 
+    // free the message contents and the message.
     ws_message_free(msg);
     free(msg);
   }
+  // free the client.
   ws_client_free(&client);
   return 0;
 }
@@ -83,7 +164,8 @@ Example of using the supplied `ws_client_on_msg` callback loop.
 #include "headers/reader.h"
 #include "headers/websocket.h"
 
-#define LISTENER_URL "ws://127.0.0.1:3000/ws"
+// URL
+#define LISTENER_URL "ws://localhost:3000/ws"
 
 static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void *context) {
   // handle the message
@@ -91,18 +173,74 @@ static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void 
 }
 
 int main(int argc, char **argv) {
+  // construct our client from the URL string.
   struct ws_client_t client;
   if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
     fprintf(stderr, "client from string URL failed.\n");
     return 1;
   }
+
+  // connect the client to the server.
   if (!ws_client_connect(&client)) {
     fprintf(stderr, "client failed to connect.\n");
     return 1;
   }
   printf("listening for messages...\n");
+  // blocking call to handle messages on the given callback
   ws_client_on_msg(&client, callback, NULL);
+
+  // free.
   ws_client_free(&client);
+  return 0;
+}
+```
+
+### OpenSSL Example
+
+A simple example of using OpenSSL.
+
+```c
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "headers/reader.h"
+#include "headers/websocket.h"
+
+// URL
+#define LISTENER_URL "wss://localhost:443/ws"
+
+static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void *context) {
+  // handle the message
+  return true;
+}
+
+int main(int argc, char **argv) {
+  // Initialize the OpenSSL functionality.
+  net_init_client("./certs/server.crt", NULL);
+
+  // construct our client from the URL string.
+  struct ws_client_t client;
+  if (!ws_client_from_str(LISTENER_URL, strlen(LISTENER_URL), &client)) {
+    fprintf(stderr, "client from string URL failed.\n");
+    return 1;
+  }
+
+  // Connect the client to the server.
+  if (!ws_client_connect(&client)) {
+    fprintf(stderr, "client failed to connect.\n");
+    return 1;
+  }
+  printf("listening for messages...\n");
+
+  // blocking call to handle messages on the given callback
+  ws_client_on_msg(&client, callback, NULL);
+
+  // free client
+  ws_client_free(&client);
+  // deinitialize OpenSSL
+  net_deinit();
   return 0;
 }
 ```

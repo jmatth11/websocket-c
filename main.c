@@ -21,7 +21,7 @@ static void init() { net_init_client("./test/server.crt", NULL); }
 static void deinit() { net_deinit(); }
 
 #else
-#define LISTENER_URL "ws://localhost:80/ws"
+#define LISTENER_URL "ws://localhost:3000/ws"
 // empty since we aren't using ssl
 static void init() {}
 static void deinit() {}
