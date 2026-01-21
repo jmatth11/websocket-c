@@ -11,6 +11,7 @@ Table of Contents:
     - [Manual Loop](#manual-loop)
     - [Callback Loop](#callback-loop)
     - [OpenSSL Example](#openssl-example)
+- [Demo](#demo)
 
 
 Simple WebSocket library in C.
@@ -244,3 +245,9 @@ int main(int argc, char **argv) {
   return 0;
 }
 ```
+
+## Demo
+
+This is a small demo running the test application with TLS turned on.
+
+
