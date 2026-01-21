@@ -4,6 +4,7 @@ INCLUDES=-I. -I./deps/cstd/headers -I./deps/cstd/deps/utf8-zig/headers/
 LIBS=-L./deps/cstd/lib -L./deps/cstd/deps/utf8-zig/zig-out/lib/ -lcustom_std -lutf8-zig
 SOURCES=$(shell find . -name '*.c' -not -path './plugins/*' -not -path './deps/*' -not -path './libs/*' -not -path './tests/*')
 TARGET=main
+DFLAGS=-DAPP_HASH=$(git log -n 1 --pretty=format:"%H")
 
 ifeq ($(DEBUG), 1)
 	CFLAGS += -DDEBUG=1 -ggdb
@@ -14,6 +15,11 @@ endif
 ifeq ($(SHARED), 1)
 	SOURCES=$(shell find ./src -name '*.c')
 	TARGET=libws
+endif
+
+ifeq ($(USE_SSL), 1)
+	LIBS += $(pkg-config --libs libssl)
+	DFLAGS += " -DWEBC_USE_SSL=1"
 endif
 
 OBJECTS=$(addprefix $(OBJ)/,$(SOURCES:%.c=%.o))
@@ -33,7 +39,7 @@ endif
 
 $(OBJ)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) -c -fPIC -o $@ $< $(CFLAGS) $(INCLUDES)
+	$(CC) -c -fPIC -o $@ $< $(CFLAGS) $(INCLUDES) $(DFLAGS)
 
 .PHONY: clean
 clean:

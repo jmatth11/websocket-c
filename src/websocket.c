@@ -4,6 +4,7 @@
 #include "headers/reader.h"
 #include "unicode_str.h"
 #include "magic.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <netdb.h>
 
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // ^ quick overview of spec to implement
@@ -21,15 +23,16 @@
 #define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
 
 #define WS_PREFIX "ws://"
+#define WSS_PREFIX "wss://"
 #define PORT_SEP ':'
 #define PATH_SEP '/'
 #define PROTOCOL "HTTP/1.1"
 static char *empty_path = "/";
 
 struct __ws_client_internal_t {
-  int socket;
   struct sockaddr_in addr;
   struct ws_reader_t *reader;
+  int socket;
 };
 
 #ifdef DEBUG
@@ -147,6 +150,9 @@ bool ws_client_init(struct ws_client_t* client) {
   client->port = 80;
   client->version = 13;
   client->__internal = NULL;
+#ifdef WEBC_USE_SSL
+  client->use_tls = false;
+#endif
   return true;
 }
 
@@ -164,18 +170,37 @@ bool ws_client_from_str(const char *url, size_t len,
   client->path = NULL;
   client->port = 80;
   client->version = 13;
-  const size_t prefix_len = strlen(WS_PREFIX);
-  if (len <= prefix_len) {
+#ifdef WEBC_USE_SSL
+  client->use_tls = false;
+#endif
+  const size_t ws_prefix_len = strlen(WS_PREFIX);
+  if (len <= ws_prefix_len) {
     fprintf(stderr, "URL len was the same size or shorter than the expected "
                     "WebSocket prefix length.\n");
     return false;
   }
-  size_t offset = 0;
-  if (strncmp(WS_PREFIX, url, prefix_len) != 0) {
-    fprintf(stderr, "URL does not start with a valid WebSocket prefix.\n");
+  const size_t wss_prefix_len = strlen(WSS_PREFIX);
+  if (len <= wss_prefix_len) {
+    fprintf(stderr, "URL len was the same size or shorter than the expected "
+                    "WebSocket Secure prefix length.\n");
     return false;
   }
-  offset += prefix_len;
+  size_t offset = ws_prefix_len;
+  if (strncmp(WS_PREFIX, url, ws_prefix_len) != 0) {
+    // check for wss
+    if (strncmp(WSS_PREFIX, url, wss_prefix_len) == 0) {
+#ifdef WEBC_USE_SSL
+      client->use_tls = true;
+      offset = ws_prefix_len;
+#else
+      fprintf(stderr, "Library was not built with SSL support.\nBuild with -DUSE_SSL=1.\n");
+      return false;
+#endif
+    } else {
+      fprintf(stderr, "URL does not start with a valid WebSocket prefix.\n");
+      return false;
+    }
+  }
   size_t next_offset = strcspn(&url[offset], ":/");
   const size_t host_len = next_offset;
   client->host = malloc((sizeof(char) * host_len) + 1);
@@ -184,7 +209,7 @@ bool ws_client_from_str(const char *url, size_t len,
     return false;
   }
   client->host[host_len] = '\0';
-  if ((next_offset + prefix_len) >= len) {
+  if ((next_offset + ws_prefix_len) >= len) {
     return true;
   }
   offset += next_offset;
@@ -223,6 +248,8 @@ bool ws_client_connect(struct ws_client_t *client) {
     fprintf(stderr, "WebSocket client's host was null.\n");
     return false;
   }
+  // TODO use getaddrinfo from <netdb.h> to get IP address from hostname
+  // getaddrinfo(<host>, <port>, <hints (i.e. IPv4 only or IPv4 and 6), <results>)
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
   client->__internal->addr.sin_family = AF_INET;
   client->__internal->addr.sin_port = htons(client->port);

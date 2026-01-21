@@ -35,6 +35,12 @@ struct ws_client_t {
    * Default is 13.
    */
   unsigned short version;
+#ifdef WEBC_USE_SSL
+  /**
+   * Flag to use TLS connection.
+   */
+  bool use_tls;
+#endif
 };
 
 /**
