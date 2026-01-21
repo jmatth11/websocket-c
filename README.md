@@ -210,6 +210,8 @@ static bool callback(struct ws_client_t *client, struct ws_message_t *msg, void 
 
 int main(int argc, char **argv) {
   // Initialize the OpenSSL functionality.
+  // This is an example of setting a self-signed cert.
+  // For publicly hosted server you can pass NULL.
   net_init_client("./certs/server.crt", NULL);
 
   // construct our client from the URL string.
