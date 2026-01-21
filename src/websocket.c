@@ -418,6 +418,7 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_arr
     if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) == NULL) {
       return false;
     }
+    frame.payload.len = frame.payload.cap;
   }
   byte_array DEFER(byte_array_free) out;
   memset(&out, 0, sizeof(byte_array));

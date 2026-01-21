@@ -24,6 +24,9 @@ ifeq ($(USE_SSL), 1)
 	LIBS += $(shell pkg-config --libs openssl)
 	DFLAGS += -DWEBC_USE_SSL=1
 endif
+ifeq ($(DISABLE_SIMD), 1)
+	DFLAGS += -DDISABLE_SIMD=1
+endif
 
 OBJECTS=$(addprefix $(OBJ)/,$(SOURCES:%.c=%.o))
 
