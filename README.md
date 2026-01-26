@@ -18,12 +18,23 @@ Supports both `ws` and `wss` (if built with OpenSSL. see [build options](#build-
 
 ## Dependencies
 
-Use the `./install_deps.sh` file to install the dependencies for the project.
+To install all dependencies for the project run `./install_deps.sh`
+
+Use the `./script/dev_deps.sh` file to install system dependencies for the project.
+These include libraries or tools needed to build the project.
+
+Use the `./script/lib_deps.sh` file to install library dependencies for the project.
+These include libraries this library uses directly.
 
 Required Deps:
 - [Zig](https://github.com/ziglang/zig) The Zig programming language.
 - [cstd](https://github.com/jmatth11/cstd) Common standard C functionality library.
 - [utf8-zig](https://github.com/jmatth11/utf8-zig) Small UTF8 helper library written in Zig.
+
+Optional Deps:
+- [OpenSSL](https://openssl-library.org/source/) The OpenSSL library for secure
+  connections. Only used if ssl flag is on when building.
+  (`USE_SSL=1`/`-Duse_ssl`)
 
 ## Build
 
@@ -69,7 +80,7 @@ To run the test application there is a Go application provided to run against.
    build`.
 3. Then run the application from that directory with `./test`.
 4. Then from the root directory of the project run the test application with
-   `./run.sh`.
+   `./script/run.sh`.
 
 You will be presented with a prompt in the terminal whatever you type (up-to
 100 characters) will be sent to the server and echoed back to you.
@@ -85,7 +96,7 @@ You will be presented with a prompt in the terminal whatever you type (up-to
 4. Then run the application from that directory with `sudo ./test tls`. The
    `tls` argument will start a TLS server.
 5. Then from the root directory of the project run the test application with
-   `./run.sh`.
+   `./script/run.sh`.
 
 You will be presented with a prompt in the terminal whatever you type (up-to
 100 characters) will be sent to the server and echoed back to you.
