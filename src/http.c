@@ -50,12 +50,12 @@ static char * normalized_cstr(const char *str, size_t len) {
   struct unicode_str_t DEFER(unicode_str_destroy) *uni_str = unicode_str_create();
   if (unicode_str_set_char(uni_str, str, len) < len) {
     fprintf(stderr, "failed to set header during unicode conversion.\n");
-    return false;
+    return NULL;
   }
   struct unicode_str_t DEFER(unicode_str_destroy) *new_str = unicode_str_to_lower(uni_str);
   if (new_str == NULL) {
     fprintf(stderr, "failed to generate normalized str for header.\n");
-    return false;
+    return NULL;
   }
   char *normalized_str = unicode_str_to_cstr(new_str);
   return normalized_str;

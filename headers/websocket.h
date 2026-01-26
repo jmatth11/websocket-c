@@ -8,6 +8,11 @@
 #include "reader.h"
 #include "unicode_str.h"
 
+/**
+ * Get the library version hash.
+ */
+const char * lib_version();
+
 // forward ref
 struct net_info_t;
 
