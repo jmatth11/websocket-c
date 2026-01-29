@@ -161,6 +161,7 @@ ws_frame_handle_payload_simd(uint8_t masking_key[4], uint8_t *restrict dest,
   // convert the remaining bytes.
   return ws_frame_handle_payload_serial(masking_key, dest, src, len, offset - 15);
 }
+// TODO create generic version with vector extension (__vector_size (in cstd))
 #elif defined(__SSE2__) && !defined(DISABLE_SIMD)
 /**
  * Intel SIMD implementation of mask handling.
