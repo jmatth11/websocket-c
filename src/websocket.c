@@ -18,6 +18,14 @@
 #include <unistd.h>
 #include <netdb.h>
 
+#ifndef APP_HASH
+#define APP_HASH "UNOFFICIAL"
+#endif
+
+const char * lib_version() {
+  return APP_HASH;
+}
+
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // ^ quick overview of spec to implement
 
