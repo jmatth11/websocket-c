@@ -1,17 +1,10 @@
 #include "headers/protocol.h"
+#include "headers/simd.h"
 #include "unicode_str.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-#if defined(__ARM_NEON) && !defined(DISABLE_SIMD)
-// ARM SIMD
-#include <arm_neon.h>
-#elif defined(__SSE2__) && !defined(DISABLE_SIMD)
-// Intel SIMD
-#include <immintrin.h>
-#endif
 
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
 
@@ -106,102 +99,6 @@ static enum ws_frame_error_t ws_frame_extract_mask(struct ws_frame_t *frame,
   return WS_FRAME_SUCCESS;
 }
 
-static enum ws_frame_error_t
-ws_frame_handle_payload_serial(uint8_t masking_key[4], uint8_t *restrict dest,
-                               uint8_t *restrict src, size_t len,
-                               size_t offset) {
-  if (len == 0) {
-    return WS_FRAME_SUCCESS;
-  }
-  for (size_t index = offset; index < len; index++) {
-    dest[index] = src[index] ^ masking_key[index & 3];
-  }
-  return WS_FRAME_SUCCESS;
-}
-
-#if defined(__ARM_NEON) && !defined(DISABLE_SIMD)
-// TODO verify this function
-/**
- * ARM SIMD implementation of mask handling.
- */
-static enum ws_frame_error_t
-ws_frame_handle_payload_simd(uint8_t masking_key[4], uint8_t *restrict dest,
-                             uint8_t *restrict src, size_t len) {
-  if (len == 0) {
-    return WS_FRAME_SUCCESS;
-  }
-  if (len <= 15) {
-    return ws_frame_handle_payload_serial(masking_key, dest, src, len, 0);
-  }
-  // operate on 16 bytes at a time.
-  size_t offset = 15;
-  const size_t cutoff = len;
-  const uint8_t m1 = masking_key[0];
-  const uint8_t m2 = masking_key[1];
-  const uint8_t m3 = masking_key[2];
-  const uint8_t m4 = masking_key[3];
-  // repeat the mask 4 times.
-  const uint8_t mask_buf[16] = {m4, m3, m2, m1, m4, m3, m2, m1,
-                                m4, m3, m2, m1, m4, m3, m2, m1};
-  // load mask into register
-  uint8x16_t mask_simd = vld1q_u8(mask_buf);
-
-  while (offset < cutoff) {
-    // loading them in reverse order so we can store them directly.
-    const uint8_t vec_buf = {
-        src[offset],      src[offset - 1],  src[offset - 2],  src[offset - 3],
-        src[offset - 4],  src[offset - 5],  src[offset - 6],  src[offset - 7],
-        src[offset - 8],  src[offset - 9],  src[offset - 10], src[offset - 11],
-        src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]};
-    uint8x16_t vec1 = vld1q_u8(vec_buf);
-    uint8x16_t result = veorq_u8(vec1, mask_simd);
-    vst1q_u8(&dest[offset - 15], result);
-    offset += 16;
-  }
-  // convert the remaining bytes.
-  return ws_frame_handle_payload_serial(masking_key, dest, src, len, offset - 15);
-}
-// TODO create generic version with vector extension (__vector_size (in cstd))
-#elif defined(__SSE2__) && !defined(DISABLE_SIMD)
-/**
- * Intel SIMD implementation of mask handling.
- */
-static enum ws_frame_error_t
-ws_frame_handle_payload_simd(uint8_t masking_key[4], uint8_t *restrict dest,
-                             uint8_t *restrict src, size_t len) {
-  if (len == 0) {
-    return WS_FRAME_SUCCESS;
-  }
-  if (len <= 15) {
-    return ws_frame_handle_payload_serial(masking_key, dest, src, len, 0);
-  }
-  // operate on 16 bytes at a time.
-  size_t offset = 15;
-  const size_t cutoff = len;
-  const uint8_t m1 = masking_key[0];
-  const uint8_t m2 = masking_key[1];
-  const uint8_t m3 = masking_key[2];
-  const uint8_t m4 = masking_key[3];
-  // repeat the mask 4 times.
-  __m128i mask_simd = _mm_set_epi8(m4, m3, m2, m1, m4, m3, m2, m1, m4, m3, m2,
-                                   m1, m4, m3, m2, m1);
-
-  while (offset < cutoff) {
-    // loading them in reverse order so we can store them directly.
-    __m128i vec1 = _mm_set_epi8(
-        src[offset], src[offset - 1], src[offset - 2], src[offset - 3],
-        src[offset - 4], src[offset - 5], src[offset - 6], src[offset - 7],
-        src[offset - 8], src[offset - 9], src[offset - 10], src[offset - 11],
-        src[offset - 12], src[offset - 13], src[offset - 14], src[offset - 15]);
-    __m128i result = _mm_xor_si128(vec1, mask_simd);
-    _mm_storeu_si128((__m128i *)&dest[offset - 15], result);
-    offset += 16;
-  }
-  // convert the remaining bytes.
-  return ws_frame_handle_payload_serial(masking_key, dest, src, len, offset - 15);
-}
-#endif
-
 /**
  * Handle transferring payload from src to dest and apply a masking key if
  * supplied one.
@@ -220,11 +117,7 @@ static enum ws_frame_error_t ws_frame_handle_payload(bool mask,
       dest[i] = src[i];
     }
   } else {
-#if (defined(__SSE2__) || defined(__ARM_NEON)) && !defined(DISABLE_SIMD)
-    result = ws_frame_handle_payload_simd(masking_key, dest, src, len);
-#else
-    result = ws_frame_handle_payload_serial(masking_key, dest, src, len, 0);
-#endif
+    result = apply_mask_to_buffer(masking_key, dest, src, len);
   }
   return result;
 }

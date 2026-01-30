@@ -12,6 +12,7 @@ fn createModule(
         "src/websocket.c",
         "src/http.c",
         "src/net.c",
+        "src/simd.c",
         "src/reader.c",
         "src/protocol.c",
     };
