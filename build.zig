@@ -17,7 +17,7 @@ fn createModule(
         "src/protocol.c",
     };
     const ssl_flag: []const u8 = if (use_ssl and !web_target) "-DWEBC_USE_SSL=1" else "";
-    const simd_flag: []const u8 = if (disable_simd) "-DDISABLE_SIMD=1" else "";
+    const simd_flag: []const u8 = if (disable_simd) "-DDISABLE_SIMD=1" else "-march=native";
     const emscripten_flag: []const u8 = if (web_target) "-D__EMSCRIPTEN__=1" else "";
     const flags: []const []const u8 = &.{
         "-Wall",

@@ -26,6 +26,8 @@ ifeq ($(USE_SSL), 1)
 endif
 ifeq ($(DISABLE_SIMD), 1)
 	DFLAGS += -DDISABLE_SIMD=1
+else
+	CFLAGS += -march=native
 endif
 
 OBJECTS=$(addprefix $(OBJ)/,$(SOURCES:%.c=%.o))
@@ -37,7 +39,7 @@ OBJ=obj
 all: $(OBJECTS)
 	@mkdir -p $(BIN)
 ifeq ($(SHARED), 1)
-	$(CC) -shared -fPIC -o $(BIN)/$(TARGET).so $^ $(LIBS)
+	$(CC) -shared -fPIC -o $(BIN)/$(TARGET).so $^ $(LIBS) $(CFLAGS)
 	ar -rcs $(BIN)/$(TARGET).a $^
 else
 	$(CC) $^ -o $(BIN)/$(TARGET) $(CFLAGS) $(DFLAGS) $(LIBS)
