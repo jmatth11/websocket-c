@@ -15,6 +15,7 @@ fn createModule(
         "src/simd.c",
         "src/reader.c",
         "src/protocol.c",
+        "src/encode.c",
     };
     const ssl_flag: []const u8 = if (use_ssl and !web_target) "-DWEBC_USE_SSL=1" else "";
     const simd_flag: []const u8 = if (disable_simd) "-DDISABLE_SIMD=1" else "-march=native";

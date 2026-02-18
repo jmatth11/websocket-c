@@ -7,6 +7,8 @@
 
 #include <stdbool.h>
 
+__BEGIN_DECLS
+
 // forward declare
 struct net_info_t;
 
@@ -79,5 +81,7 @@ bool ws_message_init(struct ws_message_t *msg) __nonnull((1));
  * @param[in] msg The WebSocket Message.
  */
 void ws_message_free(struct ws_message_t *msg);
+
+__END_DECLS
 
 #endif

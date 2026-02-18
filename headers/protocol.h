@@ -6,6 +6,9 @@
 #include <stdint.h>
 
 #include "unicode_str.h"
+#include "defs.h"
+
+__BEGIN_DECLS
 
 enum ws_frame_error_t {
   WS_FRAME_SUCCESS = 0,
@@ -218,5 +221,7 @@ void ws_frame_free(struct ws_frame_t *frame);
  * @param[in] frame The WebSocket frame.
  */
 void ws_frame_print(struct ws_frame_t *frame) __nonnull((1));
+
+__END_DECLS
 
 #endif

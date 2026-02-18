@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+__BEGIN_DECLS
+
 #define HTTP_METHOD_GET "GET"
 #define HTTP_METHOD_POST "POST"
 #define HTTP_METHOD_PUT "PUT"
@@ -263,5 +265,7 @@ bool http_request_write(struct http_request_t *r, const uint8_t *buf,
  * @param[in] r The HTTP request structure.
  */
 void http_request_free(struct http_request_t *r);
+
+__END_DECLS
 
 #endif

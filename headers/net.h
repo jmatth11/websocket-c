@@ -11,6 +11,8 @@
 
 #include "defs.h"
 
+__BEGIN_DECLS
+
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -111,5 +113,7 @@ ssize_t net_write(struct net_info_t *info, const void *buf, size_t buf_len);
  * @param info The net info structure.
  */
 void net_close(struct net_info_t *info);
+
+__END_DECLS
 
 #endif

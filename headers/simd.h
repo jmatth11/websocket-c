@@ -7,6 +7,8 @@
 #include "headers/protocol.h"
 #include "defs.h"
 
+__BEGIN_DECLS
+
 /**
  * Apply mask to the src buffer into the dest buffer.
  *
@@ -21,5 +23,7 @@ enum ws_frame_error_t apply_mask_to_buffer(
     uint8_t *restrict dest,
     uint8_t *restrict src,
     size_t len) __nonnull((2, 3));
+
+__END_DECLS
 
 #endif

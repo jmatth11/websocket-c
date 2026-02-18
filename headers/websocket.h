@@ -8,6 +8,10 @@
 #include "reader.h"
 #include "unicode_str.h"
 
+#include "defs.h"
+
+__BEGIN_DECLS
+
 /**
  * Get the library version hash.
  */
@@ -153,5 +157,7 @@ bool ws_client_set_net_info(struct ws_client_t *client, struct net_info_t *info)
  * @param client The WebSocket Client.
  */
 void ws_client_free(struct ws_client_t *client);
+
+__END_DECLS
 
 #endif
