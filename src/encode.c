@@ -1,114 +1,83 @@
 #include "headers/encode.h"
+#include "magic.h"
 
+#include <math.h>
+#include <openssl/types.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-static char encoding_table[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/buffer.h>
 
-char *base64_encode(const uint8_t *data, const size_t len,
-                    size_t *output_length) {
-  if (data == NULL || len == 0) {
-    return NULL;
+#include <openssl/sha.h>
+
+#ifndef WEBC_USE_SSL
+// these are only for if we compile without OpenSSL
+#define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
+#define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
+#endif
+
+void populate_rand(uint8_t *buf, size_t len) {
+  if (buf == NULL || len == 0) {
+    return;
   }
-  const int result_len = 4 * ((len + 2) / 3);
-  char *encoded_string = malloc(result_len + 1);
-  if (encoded_string == NULL)
-    return NULL;
-
-  for (int i = 0, j = 0; i < len;) {
-    const uint32_t octet_a = i < len ? data[i++] : 0;
-    const uint32_t octet_b = i < len ? data[i++] : 0;
-    const uint32_t octet_c = i < len ? data[i++] : 0;
-
-    const uint32_t triple = (octet_a << 16) + (octet_b << 8) + octet_c;
-
-    encoded_string[j++] = encoding_table[(triple >> 18) & 0x3F];
-    encoded_string[j++] = encoding_table[(triple >> 12) & 0x3F];
-    encoded_string[j++] = encoding_table[(triple >> 6) & 0x3F];
-    encoded_string[j++] = encoding_table[triple & 0x3F];
+  // TODO maybe change to have better RNG
+  srand(time(NULL));
+  size_t max = UINT8_MAX + 1;
+  for (size_t i = 0; i < len; ++i) {
+    buf[i] = (rand() % max);
   }
-
-  // Add padding if necessary
-  for (int i = 0; i < (3 - len % 3) % 3; i++) {
-    encoded_string[result_len - 1 - i] = '=';
-  }
-  encoded_string[result_len] = '\0';
-  *output_length = result_len;
-  return encoded_string;
 }
 
-/**
- * Helper to map ASCII characters back to 6-bit values
- */
-static uint32_t base64_char_value(char c) {
-  if (c >= 'A' && c <= 'Z') {
-    return c - 'A';
+char *generate_noonce(uint8_t *buf, size_t len, size_t *output_length) {
+  if (buf == NULL || len == 0) {
+    return NULL;
   }
-  if (c >= 'a' && c <= 'z') {
-    return c - 'a' + 26;
-  }
-  if (c >= '0' && c <= '9') {
-    return c - '0' + 52;
-  }
-  if (c == '+') {
-    return 62;
-  }
-  if (c == '/') {
-    return 63;
-  }
-  // For padding '=' or invalid characters
-  return -1;
+#ifdef WEBC_USE_SSL
+  BIO *bio = NULL;
+  BIO *b64 = NULL;
+  b64 = BIO_new(BIO_f_base64());
+  bio = BIO_new(BIO_s_mem());
+  bio = BIO_push(b64, bio);
+  // Ignore newlines - write everything in one line
+  BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+  (void)BIO_write(bio, buf, len);
+  (void)BIO_flush(bio);
+
+  BUF_MEM *buffer_ptr;
+  (void)BIO_get_mem_ptr(bio, &buffer_ptr);
+
+  const int encodedSize = 4*ceil((double)len/3);
+  char *buffer = (char *)malloc(encodedSize+1);
+  memcpy(buffer, buffer_ptr, encodedSize);
+  *output_length = encodedSize;
+  // free all
+  BIO_free_all(bio);
+  return buffer;
+#else
+  return REQUEST_NOONCE;
+#endif
 }
 
-uint8_t *base64_decode(const char *data, const size_t len,
-                       size_t *output_length) {
-  if (data == NULL || len == 0) {
+// TODO finish
+bool check_response_noonce(uint8_t *buf, size_t buf_len, char *noonce, size_t noonce_len) {
+  if (buf == NULL || buf_len == 0 || noonce == NULL || noonce_len == 0) {
     return NULL;
   }
-  // Base64 must be a multiple of 4
-  if ((len % 4) != 0) {
-    return NULL;
-  }
+#ifdef WEBC_USE_SSL
+  size_t req_len = 0;
+  char AUTO_C *req_noonce = generate_noonce(buf, buf_len, &req_len);
+  if (req_noonce == NULL) return false;
 
-  // Calculate output size
-  size_t result_len = (len / 4) * 3;
-  // subtract any padding
-  if (data[len - 1] == '=') {
-    result_len--;
-  }
-  if (data[len - 2] == '=') {
-    result_len--;
-  }
+  // TODO concat req_noonce with this UUID string "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+  // then SHA1 it and compare to response noonce.
 
-  uint8_t *decoded_data = (uint8_t *)malloc(result_len + 1);
-  if (decoded_data == NULL) {
-    return NULL;
-  }
-
-  for (int i = 0, j = 0; i < len;) {
-    // Grab 4 characters and convert to 6-bit values
-    const uint32_t sexte_a = data[i] == '=' ? 0 : base64_char_value(data[i++]);
-    const uint32_t sexte_b = data[i] == '=' ? 0 : base64_char_value(data[i++]);
-    const uint32_t sexte_c = data[i] == '=' ? 0 : base64_char_value(data[i++]);
-    const uint32_t sexte_d = data[i] == '=' ? 0 : base64_char_value(data[i++]);
-
-    // Combine into a 24-bit triple
-    const uint32_t triple =
-        (sexte_a << 18) + (sexte_b << 12) + (sexte_c << 6) + sexte_d;
-
-    // Extract the 3 bytes
-    if (j < *output_length) {
-      decoded_data[j++] = (triple >> 16) & 0xFF;
-    }
-    if (j < *output_length) {
-      decoded_data[j++] = (triple >> 8) & 0xFF;
-    }
-    if (j < *output_length) {
-      decoded_data[j++] = triple & 0xFF;
-    }
-  }
-  decoded_data[result_len] = '\0';
-  *output_length = result_len;
-  return decoded_data;
+  return true;
+#else
+  return strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) == 0;
+#endif
 }

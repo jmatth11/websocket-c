@@ -1,4 +1,5 @@
 #include "headers/websocket.h"
+#include "headers/encode.h"
 #include "headers/http.h"
 #include "headers/protocol.h"
 #include "headers/reader.h"
@@ -8,6 +9,7 @@
 #include "string_ops.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,13 +40,14 @@ const char * lib_version() {
 #define PORT_SEP ':'
 #define PATH_SEP '/'
 #define PROTOCOL "HTTP/1.1"
+#define NOONCE_LEN 16
 static char *empty_path = "/";
 
 struct __ws_client_internal_t {
   struct ws_reader_t *reader;
   struct net_info_t info;
-// TODO finish setting up this noonce with the new base64 encode functions
-  char *noonce;
+  // noonce is 16 byte random value for initial handshake
+  uint8_t noonce[NOONCE_LEN];
 };
 
 #ifdef DEBUG
@@ -102,8 +105,9 @@ static bool set_handshake_headers(struct http_request_t *req,
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
-  // TODO replace with base64 functionality
-  if (!http_request_set_header(req, "sec-websocket-key", REQUEST_NOONCE)) {
+  populate_rand(client->__internal->noonce, NOONCE_LEN);
+  char AUTO_C *noonce = base64_encode(client->__internal->noonce, NOONCE_LEN, NULL);
+  if (!http_request_set_header(req, "sec-websocket-key", noonce)) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
   }
@@ -307,16 +311,15 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
-  // TODO support dynamic generation of Accept value
-  char *noonce = NULL;
-  if (!http_response_get_header(&resp, "sec-websocket-accept", &noonce)) {
+  char *recv_noonce = NULL;
+  if (!http_response_get_header(&resp, "sec-websocket-accept", &recv_noonce)) {
     fprintf(stderr, "failed to get HTTP response header value.\n");
     net_close(&client->__internal->info);
     free(client->__internal);
     return false;
   }
   // TODO replace with base64 functionality
-  if (strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
+  if (strncmp(recv_noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
     net_close(&client->__internal->info);

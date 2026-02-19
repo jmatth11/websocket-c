@@ -30,6 +30,14 @@ char *base64_encode(const uint8_t *data, const size_t len,
 uint8_t *base64_decode(const char *data, const size_t len,
                        size_t *output_length);
 
+/**
+ * Populate the given buffer with random data.
+ *
+ * @param[out] buf The buffer to populate.
+ * @param[in] len The length of the buffer.
+ */
+void populate_rand(uint8_t *buf, size_t len);
+
 __END_DECLS
 
 #endif
