@@ -44,6 +44,9 @@ static bool callback(struct ws_client_t *client, struct ws_message_t *msg,
   (void)client;
   (void)context;
   // print the msg
+  if (msg == NULL) {
+    return false;
+  }
   printf("response(type:%d):\n", msg->type);
   print_byte_array(&msg->body);
   // return true for successful execution.
@@ -122,6 +125,8 @@ int main(void) {
     // loop until quit is entered
   } while (strncmp("quit\n", stdin_buf, 5) != 0);
 
+  // TODO maybe move to bottom
+  pthread_join(thread, NULL);
   // cleanup
   byte_array_free(&send_buffer);
   ws_client_free(&client);

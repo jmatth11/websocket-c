@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"os"
@@ -33,6 +34,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		log.Printf("recv: type%v -- %s\n", messageType, p)
+		if bytes.Equal(p, []byte("quit")) {
+			break;
+		}
 
 		// Write message back to the client (echo example)
 		err = conn.WriteMessage(messageType, p)
