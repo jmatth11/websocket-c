@@ -1,6 +1,7 @@
 #ifndef CSTD_WS_ENCODE_H
 #define CSTD_WS_ENCODE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -9,26 +10,26 @@
 __BEGIN_DECLS
 
 /**
- * Encode data into Base64.
+ * Generate base64 string from the given buffer.
+ * The caller is responsible for freeing the returned string.
  *
- * @param data The data to encode.
- * @param len The length of the data.
- * @param[out] output_length The output length of the encoded string.
- * @return The Base64 encoded string, NULL on failure.
+ * @param[in] buf The input buffer.
+ * @param[in] len The length of the input buffer.
+ * @param[out] output_length The length of the generated base64 string.
+ * @return The generated base64 string, NULL on failure.
  */
-char *base64_encode(const uint8_t *data, const size_t len,
-                    size_t *output_length);
+char *base64_encode(uint8_t *buf, size_t len, size_t *output_length);
 
 /**
- * Decode Base64 string.
+ * Check the response noonce with the given buffer.
  *
- * @param data The Base64 data.
- * @param len The length of the data.
- * @param[out] output_length The output length of the decoded data.
- * @return The decoded data, NULL on failure.
+ * @param[in] buf The input buffer.
+ * @param[in] buf_len The length of the input buffer.
+ * @param[in] noonce The response noonce.
+ * @param[in] noonce_len The length of the response noonce.
+ * @return True if the check passes, false otherwise.
  */
-uint8_t *base64_decode(const char *data, const size_t len,
-                       size_t *output_length);
+bool check_response_noonce(uint8_t *buf, size_t buf_len, char *noonce, size_t noonce_len);
 
 /**
  * Populate the given buffer with random data.

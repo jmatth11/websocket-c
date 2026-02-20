@@ -135,15 +135,6 @@ struct ws_frame_t {
 };
 
 /**
- * Generate a mask and set it to the given uint8_t array.
- *
- * @param[in/out] mask The mask array to populate.
- * @param[in] len The length of the mask.
- * @return True for success, false otherwise.
- */
-bool ws_generate_mask(uint8_t *mask, size_t len) __nonnull((1));
-
-/**
  * Initialize WebSocket Frame structure.
  *
  * @param[in] frame The WebSocket frame structure.

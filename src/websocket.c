@@ -1,12 +1,12 @@
 #include "headers/websocket.h"
 #include "headers/encode.h"
 #include "headers/http.h"
+#include "headers/net.h"
 #include "headers/protocol.h"
 #include "headers/reader.h"
-#include "headers/net.h"
-#include "unicode_str.h"
 #include "magic.h"
 #include "string_ops.h"
+#include "unicode_str.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,25 +15,19 @@
 #include <string.h>
 // network related
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <netdb.h>
 
 #ifndef APP_HASH
 #define APP_HASH "UNOFFICIAL"
 #endif
 
-const char * lib_version() {
-  return APP_HASH;
-}
+const char *lib_version() { return APP_HASH; }
 
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // ^ quick overview of spec to implement
-
-// TODO replace these with the new base64 functionality
-#define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
-#define RESPONSE_NOONCE "mj/2Q6QlJ3Y5pun3vzHGmTO/xgs="
 
 #define WS_PREFIX "ws://"
 #define WSS_PREFIX "wss://"
@@ -62,8 +56,8 @@ static inline void print_debug(struct ws_client_t *client) {
     fprintf(stderr, "host is null\n");
     return;
   }
-  printf("client->host: %s:%d%s\nversion: %d\n", client->host,
-         client->port, path, client->version);
+  printf("client->host: %s:%d%s\nversion: %d\n", client->host, client->port,
+         path, client->version);
 }
 
 #define debug_client(client) print_debug(client)
@@ -106,7 +100,8 @@ static bool set_handshake_headers(struct http_request_t *req,
     return false;
   }
   populate_rand(client->__internal->noonce, NOONCE_LEN);
-  char AUTO_C *noonce = base64_encode(client->__internal->noonce, NOONCE_LEN, NULL);
+  char AUTO_C *noonce =
+      base64_encode(client->__internal->noonce, NOONCE_LEN, NULL);
   if (!http_request_set_header(req, "sec-websocket-key", noonce)) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
@@ -154,7 +149,7 @@ static char *initial_handshake(struct ws_client_t *client) {
   return result;
 }
 
-bool ws_client_init(struct ws_client_t* client) {
+bool ws_client_init(struct ws_client_t *client) {
   client->host = NULL;
   client->path = NULL;
   client->port = 80;
@@ -203,7 +198,8 @@ bool ws_client_from_str(const char *url, size_t len,
       client->use_tls = true;
       offset = wss_prefix_len;
 #else
-      fprintf(stderr, "Library was not built with SSL support.\nBuild with \"make USE_SSL=1\" or \"zig build -Duse_ssl\".\n");
+      fprintf(stderr, "Library was not built with SSL support.\nBuild with "
+                      "\"make USE_SSL=1\" or \"zig build -Duse_ssl\".\n");
       return false;
 #endif
     } else {
@@ -213,12 +209,7 @@ bool ws_client_from_str(const char *url, size_t len,
   }
   size_t next_offset = strcspn(&url[offset], ":/");
   const size_t host_len = next_offset;
-  client->host = malloc((sizeof(char) * host_len) + 1);
-  if (strncpy(client->host, &url[offset], host_len) == NULL) {
-    fprintf(stderr, "failed to copy host from URL.\n");
-    return false;
-  }
-  client->host[host_len] = '\0';
+  client->host = str_dup(&url[offset], host_len);
   if ((next_offset + ws_prefix_len) >= len) {
     return true;
   }
@@ -237,12 +228,7 @@ bool ws_client_from_str(const char *url, size_t len,
   }
   if (offset != len && url[offset] == PATH_SEP) {
     const size_t path_len = (len - offset);
-    client->path = malloc((sizeof(char) * path_len) + 1);
-    if (strncpy(client->path, &url[offset], path_len) == NULL) {
-      fprintf(stderr, "failed to copy path from URL.\n");
-      return false;
-    }
-    client->path[path_len] = '\0';
+    client->path = str_dup(&url[offset], path_len);
   }
   return true;
 }
@@ -318,8 +304,9 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
-  // TODO replace with base64 functionality
-  if (strncmp(recv_noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) != 0) {
+  if (!check_response_noonce(
+        client->__internal->noonce, NOONCE_LEN,
+        recv_noonce, strlen(recv_noonce))) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
     net_close(&client->__internal->info);
@@ -365,7 +352,8 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
   return true;
 }
 
-bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb, void *context) {
+bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb,
+                      void *context) {
   bool running = true;
   bool close_sock = false;
   while (running) {
@@ -412,7 +400,8 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb, void *
   return true;
 }
 
-bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_array body) {
+bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type,
+                     byte_array body) {
   struct ws_frame_t DEFER(ws_frame_free) frame;
   // always returns true
   (void)ws_frame_init(&frame);
@@ -422,7 +411,7 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_arr
   // client is required to use a mask
   frame.info.flags.mask = 1;
   // always true
-  (void)ws_generate_mask(frame.masking_key, 4);
+  (void)populate_rand(frame.masking_key, 4);
   if (body.len > 0) {
     if (!byte_array_init(&frame.payload, body.len)) {
       return false;
@@ -431,7 +420,8 @@ bool ws_client_write(struct ws_client_t *client, enum ws_opcode_t type, byte_arr
       // TODO send better error message
       return false;
     }
-    if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) == NULL) {
+    if (memcpy(frame.payload.byte_data, body.byte_data, frame.payload.cap) ==
+        NULL) {
       return false;
     }
     frame.payload.len = frame.payload.cap;
@@ -452,8 +442,10 @@ bool ws_client_write_msg(struct ws_client_t *client, struct ws_message_t *msg) {
   return ws_client_write(client, msg->type, msg->body);
 }
 
-bool ws_client_set_net_info(struct ws_client_t *client, struct net_info_t *info) {
-  if (client->__internal == NULL) return false;
+bool ws_client_set_net_info(struct ws_client_t *client,
+                            struct net_info_t *info) {
+  if (client->__internal == NULL)
+    return false;
   client->__internal->info = *info;
   return true;
 }

@@ -8,16 +8,6 @@
 
 #define _SHIFT_LEN(x, n) (((uint64_t)x) << n)
 
-bool ws_generate_mask(uint8_t *mask, size_t len) {
-  // TODO change this to a better rng
-  srand(time(NULL));
-  size_t max = UINT8_MAX + 1;
-  for (size_t i = 0; i < len; ++i) {
-    mask[i] = (rand() % max);
-  }
-  return true;
-}
-
 bool ws_frame_init(struct ws_frame_t *frame) {
   memset(frame, 0, sizeof(struct ws_frame_t));
   return true;
