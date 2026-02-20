@@ -7,6 +7,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef DEBUG
+#include <stdio.h>
+#endif
+
 #ifndef WEBC_USE_SSL
 // these are only for if we compile without OpenSSL
 #define REQUEST_NOONCE "7Wrl5Wp3kkEaYOVhio4o6w=="
@@ -46,26 +50,25 @@ char *base64_encode(uint8_t *buf, size_t len, size_t *output_length) {
   BIO *b64 = NULL;
   b64 = BIO_new(BIO_f_base64());
   bio = BIO_new(BIO_s_mem());
-  bio = BIO_push(b64, bio);
+  b64 = BIO_push(b64, bio);
   // Ignore newlines - write everything in one line
-  BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-  (void)BIO_write(bio, buf, len);
-  (void)BIO_flush(bio);
+  BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+  (void)BIO_write(b64, buf, len);
+  (void)BIO_flush(b64);
 
   BUF_MEM *buffer_ptr;
-  (void)BIO_get_mem_ptr(bio, &buffer_ptr);
+  (void)BIO_get_mem_ptr(b64, &buffer_ptr);
 
-  const int encodedSize = 4 * ceil((double)len / 3);
-  char *buffer = (char *)malloc(encodedSize + 1);
-  memcpy(buffer, buffer_ptr, encodedSize);
-  buffer[encodedSize] = '\0';
-  *output_length = encodedSize;
+  char *buffer = (char *)malloc(buffer_ptr->length + 1);
+  memcpy(buffer, buffer_ptr->data, buffer_ptr->length);
+  buffer[buffer_ptr->length] = '\0';
+  *output_length = buffer_ptr->length;
   // free all
-  BIO_free_all(bio);
+  BIO_free_all(b64);
   return buffer;
 #else
   *output_length = strlen(REQUEST_NOONCE);
-  return REQUEST_NOONCE;
+  return str_dup(REQUEST_NOONCE, strlen(REQUEST_NOONCE));
 #endif
 }
 
@@ -100,6 +103,10 @@ bool check_response_noonce(uint8_t *buf, size_t buf_len, char *noonce,
   if (base64_resp_noonce == NULL || base64_resp_len == 0) {
     return false;
   }
+#ifdef DEBUG
+  printf("check response noonce concat: %s, %lu, %zu\n", resp_noonce, strlen(resp_noonce), resp_noonce_len);
+  printf("check response noonce: %s\n", base64_resp_noonce);
+#endif
   return strncmp(base64_resp_noonce, noonce, noonce_len) == 0;
 #else
   return strncmp(noonce, RESPONSE_NOONCE, strlen(RESPONSE_NOONCE)) == 0;

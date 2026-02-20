@@ -127,6 +127,7 @@ static void net_connect_cleanup(struct net_result_t *result) {
       ERR_print_errors_fp(stderr);
       SSL_shutdown(info->ssl);
       SSL_free(info->ssl);
+      info->ssl = NULL;
     }
 #endif
     close(info->socket);

@@ -100,8 +100,13 @@ static bool set_handshake_headers(struct http_request_t *req,
     return false;
   }
   populate_rand(client->__internal->noonce, NOONCE_LEN);
+  size_t noonce_len = 0;
   char AUTO_C *noonce =
-      base64_encode(client->__internal->noonce, NOONCE_LEN, NULL);
+      base64_encode(client->__internal->noonce, NOONCE_LEN, &noonce_len);
+  if (noonce == NULL || noonce_len == 0) {
+    fprintf(stderr, "Noonce could not be created.\n");
+    return false;
+  }
   if (!http_request_set_header(req, "sec-websocket-key", noonce)) {
     fprintf(stderr, "failed to set request header.\n");
     return false;
@@ -297,6 +302,13 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
+  if (resp.message.status_code >= 300) {
+    fprintf(stderr, "WebSocket Client connection failed with code: %d\n",
+            resp.message.status_code);
+    net_close(&client->__internal->info);
+    free(client->__internal);
+    return false;
+  }
   char *recv_noonce = NULL;
   if (!http_response_get_header(&resp, "sec-websocket-accept", &recv_noonce)) {
     fprintf(stderr, "failed to get HTTP response header value.\n");
@@ -304,9 +316,9 @@ bool ws_client_connect(struct ws_client_t *client) {
     free(client->__internal);
     return false;
   }
-  if (!check_response_noonce(
-        client->__internal->noonce, NOONCE_LEN,
-        recv_noonce, strlen(recv_noonce))) {
+  if (recv_noonce == NULL ||
+      !check_response_noonce(client->__internal->noonce, NOONCE_LEN,
+                             recv_noonce, strlen(recv_noonce))) {
     fprintf(stderr, "WebSocket Client connection was rejected.\n%s\n",
             resp.message.status_text);
     net_close(&client->__internal->info);

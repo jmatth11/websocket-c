@@ -18,7 +18,8 @@ __BEGIN_DECLS
  * @param[out] output_length The length of the generated base64 string.
  * @return The generated base64 string, NULL on failure.
  */
-char *base64_encode(uint8_t *buf, size_t len, size_t *output_length);
+char *base64_encode(uint8_t *buf, size_t len, size_t *output_length)
+    __nonnull((3));
 
 /**
  * Check the response noonce with the given buffer.
@@ -29,7 +30,8 @@ char *base64_encode(uint8_t *buf, size_t len, size_t *output_length);
  * @param[in] noonce_len The length of the response noonce.
  * @return True if the check passes, false otherwise.
  */
-bool check_response_noonce(uint8_t *buf, size_t buf_len, char *noonce, size_t noonce_len);
+bool check_response_noonce(uint8_t *buf, size_t buf_len, char *noonce,
+                           size_t noonce_len);
 
 /**
  * Populate the given buffer with random data.

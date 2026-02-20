@@ -55,14 +55,14 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const use_ssl = b.option(bool, "use_ssl", "Use OpenSSL for WebSocket Secure support.") orelse false;
     const disable_simd = b.option(bool, "disable_simd", "Disable SIMD instructions.") orelse false;
-    const webTarget = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
-    const webLib = b.addLibrary(.{
-        .name = "webws",
-        .linkage = .static,
-        .root_module = createModule(b, optimize, webTarget, use_ssl, disable_simd),
-        .use_llvm = true,
-    });
-    b.installArtifact(webLib);
+    //const webTarget = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    //const webLib = b.addLibrary(.{
+    //    .name = "webws",
+    //    .linkage = .static,
+    //    .root_module = createModule(b, optimize, webTarget, use_ssl, disable_simd),
+    //    .use_llvm = true,
+    //});
+    //b.installArtifact(webLib);
     const linkage = b.option(std.builtin.LinkMode, "linkage", "Link mode for ws library") orelse .static;
     const nativeTarget = b.standardTargetOptions(.{});
     const nativeLib = b.addLibrary(.{
