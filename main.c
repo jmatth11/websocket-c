@@ -59,6 +59,8 @@ void *client_msg(void *ctx) {
   struct ws_client_t *client = (struct ws_client_t *)ctx;
   // this call blocks as long as the client is open.
   ws_client_on_msg(client, callback, NULL);
+  // free once done.
+  ws_client_free(client);
   return NULL;
 }
 
@@ -125,11 +127,12 @@ int main(void) {
     // loop until quit is entered
   } while (strncmp("quit\n", stdin_buf, 5) != 0);
 
-  // TODO maybe move to bottom
-  pthread_join(thread, NULL);
   // cleanup
   byte_array_free(&send_buffer);
-  ws_client_free(&client);
+  // shutdown the ws_client_on_msg loop.
+  ws_client_shutdown_loop(&client);
+  // wait for thread
+  pthread_join(thread, NULL);
   deinit();
   return 0;
 }

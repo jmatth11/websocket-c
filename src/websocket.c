@@ -42,6 +42,7 @@ struct __ws_client_internal_t {
   struct net_info_t info;
   // noonce is 16 byte random value for initial handshake
   uint8_t noonce[NOONCE_LEN];
+  bool loop_flag;
 };
 
 #ifdef DEBUG
@@ -259,6 +260,7 @@ bool ws_client_connect(struct ws_client_t *client) {
   client->__internal = malloc(sizeof(struct __ws_client_internal_t));
   client->__internal->info = result;
   client->__internal->reader = ws_reader_create();
+  client->__internal->loop_flag = false;
   char AUTO_C *req = initial_handshake(client);
   if (req == NULL) {
     fprintf(stderr, "WebSocket client failed to create handshake.\n");
@@ -356,6 +358,10 @@ bool ws_client_recv(struct ws_client_t *client, byte_array *out) {
 }
 
 bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
+  bool is_valid = client->__internal != NULL && client->__internal->reader != NULL;
+  if (!is_valid) {
+    return false;
+  }
   if (!ws_reader_handle(client->__internal->reader,
                         &client->__internal->info)) {
     return false;
@@ -364,13 +370,35 @@ bool ws_client_next_msg(struct ws_client_t *client, struct ws_message_t **out) {
   return true;
 }
 
+static void free_ws_message(struct ws_message_t **msg) {
+  if (msg == NULL) {
+    return;
+  }
+  if (*msg == NULL) {
+    return;
+  }
+  ws_message_free(*msg);
+  free(*msg);
+  *msg = NULL;
+}
+
 bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb,
                       void *context) {
+  if (client->__internal == NULL) {
+    return false;
+  }
+  client->__internal->loop_flag = true;
   bool running = true;
   bool close_sock = false;
   while (running) {
-    struct ws_message_t *msg = NULL;
+    bool is_valid = client->__internal != NULL && client->__internal->reader != NULL;
+    if (!is_valid) {
+      break;
+    }
+    struct ws_message_t DEFER(free_ws_message) *msg = NULL;
     if (!ws_client_next_msg(client, &msg)) {
+      // TODO change the signature to return a RESULT type to know
+      // if it's an error or us manually closing the connection.
       fprintf(stderr, "client failed to recv.\n");
       break;
     }
@@ -403,8 +431,10 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb,
     default:
       break;
     }
-    ws_message_free(msg);
-    free(msg);
+    // if we didn't set the running flag to false check if the loop flag was set
+    if (!running) {
+      running = client->__internal->loop_flag;
+    }
   }
   if (close_sock) {
     ws_client_free(client);
@@ -462,6 +492,18 @@ bool ws_client_set_net_info(struct ws_client_t *client,
   return true;
 }
 
+bool ws_client_shutdown_loop(struct ws_client_t *client) {
+  if (client == NULL) {
+    return false;
+  }
+  if (client->__internal == NULL) {
+    return false;
+  }
+  client->__internal->loop_flag = false;
+  net_close(&client->__internal->info);
+  return true;
+}
+
 /**
  * Free the internal WebSocket client data.
  *
@@ -480,11 +522,13 @@ void ws_client_free(struct ws_client_t *client) {
     client->path = NULL;
   }
   if (client->__internal != NULL) {
-    net_close(&client->__internal->info);
-    if (client->__internal->reader != NULL) {
-      ws_reader_destroy(&client->__internal->reader);
-    }
-    free(client->__internal);
+    struct __ws_client_internal_t *local = client->__internal;
     client->__internal = NULL;
+
+    net_close(&local->info);
+    if (local->reader != NULL) {
+      ws_reader_destroy(&local->reader);
+    }
+    free(local);
   }
 }

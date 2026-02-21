@@ -16,10 +16,10 @@
 
 #ifdef WEBC_USE_SSL
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/tls1.h>
 #include <openssl/types.h>
-#include <openssl/evp.h>
 
 static SSL_CTX *ctx = NULL;
 /**
@@ -62,19 +62,20 @@ bool net_init_server(const char *restrict key, const char *restrict cert) {
     }
     if (key != NULL && cert != NULL) {
       if (SSL_CTX_use_certificate_file(ctx, cert, SSL_FILETYPE_PEM) <= 0) {
-          ERR_print_errors_fp(stderr);
-          SSL_CTX_free(ctx);
-          return false;
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(ctx);
+        return false;
       }
       if (SSL_CTX_use_PrivateKey_file(ctx, key, SSL_FILETYPE_PEM) <= 0) {
-          ERR_print_errors_fp(stderr);
-          SSL_CTX_free(ctx);
-          return false;
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(ctx);
+        return false;
       }
       if (!SSL_CTX_check_private_key(ctx)) {
-          fprintf(stderr, "Private key does not match the certificate public key\n");
-          SSL_CTX_free(ctx);
-          return false;
+        fprintf(stderr,
+                "Private key does not match the certificate public key\n");
+        SSL_CTX_free(ctx);
+        return false;
       }
       SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     }
@@ -152,7 +153,8 @@ bool net_connect(const char *restrict host, const char *restrict port,
   hints.ai_socktype = SOCK_STREAM;
   const int err = getaddrinfo(host, port, &hints, &res);
   if (err != 0) {
-    fprintf(stderr, "failed to get address info - host:\"%s\", port:\"%s\".\n", host, port);
+    fprintf(stderr, "failed to get address info - host:\"%s\", port:\"%s\".\n",
+            host, port);
     fprintf(stderr, "errno: %s\n", strerror(err));
     return false;
   }
@@ -218,7 +220,9 @@ ssize_t net_peek(struct net_info_t *info, void *buf, size_t buf_len) {
   if (info->ssl != NULL) {
     const ssize_t n = SSL_peek(info->ssl, buf, buf_len);
     if (n < 0) {
-      ERR_print_errors_fp(stderr);
+      if (info->ssl != NULL && SSL_get_error(info->ssl, n) != SSL_ERROR_ZERO_RETURN) {
+        ERR_print_errors_fp(stderr);
+      }
     }
     return n;
   }
@@ -238,7 +242,9 @@ ssize_t net_read(struct net_info_t *info, void *buf, size_t buf_len) {
   if (info->ssl != NULL) {
     const ssize_t n = SSL_read(info->ssl, buf, buf_len);
     if (n < 0) {
-      ERR_print_errors_fp(stderr);
+      if (info->ssl != NULL && SSL_get_error(info->ssl, n) != SSL_ERROR_ZERO_RETURN) {
+        ERR_print_errors_fp(stderr);
+      }
     }
     return n;
   }
@@ -257,7 +263,9 @@ ssize_t net_write(struct net_info_t *info, const void *buf, size_t buf_len) {
   if (info->ssl != NULL) {
     const ssize_t n = SSL_write(info->ssl, buf, buf_len);
     if (n < 0) {
-      ERR_print_errors_fp(stderr);
+      if (info->ssl != NULL && SSL_get_error(info->ssl, n) != SSL_ERROR_ZERO_RETURN) {
+        ERR_print_errors_fp(stderr);
+      }
     }
     return n;
   }

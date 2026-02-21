@@ -8,9 +8,13 @@
 struct ws_reader_t {
   struct simple_queue_t *frame_queue;
   struct simple_queue_t *msg_queue;
+  bool is_open;
 };
 
 static void construct_msg_from_frames(struct ws_reader_t *reader) {
+  if (reader == NULL || !reader->is_open) {
+    return;
+  }
   struct ws_message_t *msg = malloc(sizeof(struct ws_message_t));
   if (!ws_message_init(msg)) {
     fprintf(stderr, "message init failed.\n");
@@ -53,6 +57,7 @@ struct ws_reader_t* ws_reader_create() {
   struct ws_reader_t *result = malloc(sizeof(struct ws_reader_t));
   result->frame_queue = simple_queue_create();
   result->msg_queue = simple_queue_create();
+  result->is_open = true;
   return result;
 }
 
@@ -66,7 +71,7 @@ bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
   printf("peeking from socket\n");
 #endif
   ssize_t n = net_peek(info, header, 10);
-  if (n == -1) {
+  if (n <= -1) {
     return false;
   } else if (n == 0) {
     return true;
@@ -97,14 +102,14 @@ bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
   printf("reading from socket\n");
 #endif
   n = net_read(info, buffer, msg_len);
-  if (n == -1 && frame->codes.flags.opcode == OPCODE_CLOSE) {
+  if (n <= -1 && frame->codes.flags.opcode == OPCODE_CLOSE) {
     frame->payload.byte_data = NULL;
     frame->payload.len = 0;
     frame->payload_len = 0;
     struct ws_message_t *msg = malloc(sizeof(struct ws_message_t));
     msg->type = frame->codes.flags.opcode;
     msg->body = frame->payload;
-    if (!simple_queue_push(reader->msg_queue, msg)) {
+    if (!reader->is_open || !simple_queue_push(reader->msg_queue, msg)) {
       free(msg);
       ws_frame_free(frame);
       free(frame);
@@ -134,14 +139,14 @@ bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
       msg->type = frame->codes.flags.opcode;
       msg->body = frame->payload;
       frame->payload.byte_data = NULL;
-      if (!simple_queue_push(reader->msg_queue, msg)) {
+      if (!reader->is_open || !simple_queue_push(reader->msg_queue, msg)) {
         free(msg);
         ws_frame_free(frame);
         free(frame);
         return false;
       }
     } else {
-      if (!simple_queue_push(reader->frame_queue, frame)) {
+      if (!reader->is_open || !simple_queue_push(reader->frame_queue, frame)) {
         ws_frame_free(frame);
         free(frame);
         return false;
@@ -149,7 +154,7 @@ bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
       construct_msg_from_frames(reader);
     }
   } else {
-    if (!simple_queue_push(reader->frame_queue, frame)) {
+    if (!reader->is_open || !simple_queue_push(reader->frame_queue, frame)) {
       ws_frame_free(frame);
       free(frame);
       return false;
@@ -159,7 +164,7 @@ bool ws_reader_handle(struct ws_reader_t *reader, struct net_info_t *info) {
 }
 struct ws_message_t* ws_reader_next_msg(struct ws_reader_t *reader) {
   struct ws_message_t *result = NULL;
-  if (!simple_queue_pop(reader->msg_queue, (void**)&result)) {
+  if (reader->is_open && !simple_queue_pop(reader->msg_queue, (void**)&result)) {
     return NULL;
   }
   return result;
@@ -171,6 +176,7 @@ void ws_reader_destroy(struct ws_reader_t **reader) {
   }
   simple_queue_destroy(&(*reader)->frame_queue);
   simple_queue_destroy(&(*reader)->msg_queue);
+  (*reader)->is_open = false;
   free(*reader);
   *reader = NULL;
 }

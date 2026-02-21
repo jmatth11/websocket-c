@@ -158,6 +158,15 @@ bool ws_client_set_net_info(struct ws_client_t *client, struct net_info_t *info)
  */
 void ws_client_free(struct ws_client_t *client);
 
+/**
+ * Shutdown the internal loop inside of ws_client_on_msg.
+ * This function also closes the connection.
+ *
+ * @param client The WebSocket client.
+ * @return true on success, false otherwise.
+ */
+bool ws_client_shutdown_loop(struct ws_client_t *client);
+
 __END_DECLS
 
 #endif

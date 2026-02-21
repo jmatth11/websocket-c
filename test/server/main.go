@@ -34,7 +34,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		log.Printf("recv: type%v -- %s\n", messageType, p)
-		if bytes.Equal(p, []byte("quit")) {
+		if bytes.Equal(bytes.TrimSpace(p), []byte("quit")) {
 			break;
 		}
 
