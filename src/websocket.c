@@ -432,7 +432,7 @@ bool ws_client_on_msg(struct ws_client_t *client, on_message_callback cb,
       break;
     }
     // if we didn't set the running flag to false check if the loop flag was set
-    if (!running) {
+    if (running) {
       running = client->__internal->loop_flag;
     }
   }
