@@ -161,6 +161,17 @@ static enum ws_frame_error_t apply_mask_to_buffer_simd(uint8_t masking_key[4],
   return ws_frame_handle_payload_serial(masking_key, dest, src, len,
                                         offset - 15);
 }
+
+#else
+
+// for some reason there is no supported SIMD functionality so default to serial
+static enum ws_frame_error_t apply_mask_to_buffer_simd(uint8_t masking_key[4],
+                                                       uint8_t *restrict dest,
+                                                       uint8_t *restrict src,
+                                                       size_t len) {
+  return ws_frame_handle_payload_serial(masking_key, dest, src, len, 0);
+}
+
 #endif
 
 #endif
