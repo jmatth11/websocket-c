@@ -15,9 +15,17 @@ apply_mask_to_buffer_serial(uint8_t masking_key[4], uint8_t *restrict dest,
   return WS_FRAME_SUCCESS;
 }
 
-/* SIMD is only on newer platforms */
-#if (defined(__i386__) || defined(__x86_64__)) && !defined(DISABLE_SIMD)
+/**
+ * SIMD is only supported on certain platforms
+ * Supported platforms in this block:
+ * - x86
+ * - x86_64
+ * - arm64
+ * - arm32 7A
+ */
+#if (defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || (defined(__arm__) && defined(__ARM_ARCH_7A__))) && !defined(DISABLE_SIMD)
 
+// we prioritize the clang/gcc vector extensions
 #if defined(__clang__) || defined(__GNUC__)
 // Generic clang/gcc SIMD approach (preferred)
 
