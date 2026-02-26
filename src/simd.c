@@ -23,7 +23,9 @@ apply_mask_to_buffer_serial(uint8_t masking_key[4], uint8_t *restrict dest,
  * - arm64
  * - arm32 7A
  */
-#if (defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || (defined(__arm__) && defined(__ARM_ARCH_7A__))) && !defined(DISABLE_SIMD)
+#if (defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) ||       \
+     (defined(__arm__) && defined(__ARM_ARCH_7A__))) &&                        \
+    !defined(DISABLE_SIMD)
 
 // we prioritize the clang/gcc vector extensions
 #if defined(__clang__) || defined(__GNUC__)
@@ -180,8 +182,8 @@ enum ws_frame_error_t apply_mask_to_buffer(uint8_t masking_key[4],
                                            uint8_t *restrict dest,
                                            uint8_t *restrict src, size_t len) {
   enum ws_frame_error_t result = WS_FRAME_SUCCESS;
-#if (defined(__clang__) || defined(__GNUC__) || defined(__SSE2__) ||           \
-     defined(__ARM_NEON)) &&                                                   \
+#if (defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) ||       \
+     (defined(__arm__) && defined(__ARM_ARCH_7A__))) &&                        \
     !defined(DISABLE_SIMD)
   result = apply_mask_to_buffer_simd(masking_key, dest, src, len);
 #else
